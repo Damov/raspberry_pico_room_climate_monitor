@@ -74,7 +74,7 @@ class ScreenManager:
 
     #-- Add CO2 --------------------------------------------------------
         self.screen_writer.add_text(
-                text = f"{CO2:3.0f} ppm",
+                text = f"{CO2:4.0f} ppm",
                 x = 145,
                 y = 120,
                 invert = True
