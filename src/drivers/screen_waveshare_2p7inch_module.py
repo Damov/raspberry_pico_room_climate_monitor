@@ -328,7 +328,31 @@ class EPD_2in7_V2:
             for i in range(Width):
                 self.send_data(image[(21-i) * Height + j])
         self.TurnOnDisplay()
-        
+
+    def display_Landscape_Fast(self, image):
+        if(self.width % 8 == 0):
+            Width = self.width // 8
+        else:
+            Width = self.width // 8 + 1
+        Height = self.height
+        self.send_command(0x24)
+        for j in range(Height):
+            for i in range(Width):
+                self.send_data(image[(21-i) * Height + j])
+        self.TurnOnDisplay_Fast()
+
+    def display_Landscape_Partial(self, image):
+        if(self.width % 8 == 0):
+            Width = self.width // 8
+        else:
+            Width = self.width // 8 + 1
+        Height = self.height
+        self.send_command(0x24)
+        for j in range(Height):
+            for i in range(Width):
+                self.send_data(image[(21-i) * Height + j])
+        self.TurnOnDisplay_Partial()
+
     def display_Fast(self, image):
         if(self.width % 8 == 0):
             Width = self.width // 8

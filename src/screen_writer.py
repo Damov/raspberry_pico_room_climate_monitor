@@ -493,42 +493,37 @@ class ScreenWriter:
 
     def show(self):
         """
-            Display the buffer on the physical display if a screen driver is available.
+            Display the buffer on the physical display with full update of
+            the screen.
         """
-    #-- Set mode to landscape --------------------------------------------------
-        mode="landscape" #... (Quick workaround for showing only landscape buffer of EPD_2in7_V2 driver)
-        
-    #-- Try to guess the buffer behind fb ------------------------------------------------------------
-        buf = None
-
-    #-- Typical Waveshare 2.7" case: check for known buffer attributes based on the framebuffer used -
-        if hasattr(self.screen, "buffer_1Gray_Portrait") and self.fb is self.screen.image1Gray_Portrait:
-            buf = self.screen.buffer_1Gray_Portrait
-        elif hasattr(self.screen, "buffer_1Gray_Landscape") and self.fb is self.screen.image1Gray_Landscape:
-            buf = self.screen.buffer_1Gray_Landscape
-        elif hasattr(self.screen, "buffer_4Gray") and self.fb is self.screen.image4Gray:
-            buf = self.screen.buffer_4Gray
-
-    #-- If we couldn't guess the buffer, fall back to using the framebuffer's buffer if it exists ----
-        if mode == "fast" and hasattr(self.screen, "display_Fast"):
-            self.screen.display_Fast(buf)
-        elif mode == "base" and hasattr(self.screen, "display_Base"):
-            self.screen.display_Base(buf)
-        elif mode == "landscape" and hasattr(self.screen, "display_Landscape"):
-            self.screen.display_Landscape(buf)
-        elif mode == "partial" and hasattr(self.screen, "display_Partial"):
-            self.screen.display_Partial(buf)
-        elif mode == "4gray" and hasattr(self.screen, "display_4Gray"):
-            self.screen.display_4Gray(buf)
-        elif hasattr(self.screen, "display"):
-            self.screen.display(buf)
-    #-- Else: screen can have its own refresh() method -----------------------------------------------
-        elif hasattr(self.screen, "refresh"):
-            self.screen.refresh()
+        buf = self.screen.buffer_1Gray_Landscape
+        self.screen.display_Landscape(buf)
 
     #-- Return ---------------------------------------------------------------------------------------
         return
 
+    def show_fast(self):
+        """
+            Display the buffer on the physical display with a fast update of
+            the screen.
+        """
+        buf = self.screen.buffer_1Gray_Landscape
+        self.screen.display_Landscape_Fast(buf)
+
+    #-- Return ---------------------------------------------------------------------------------------
+        return
+
+    def show_partial(self):
+        """
+            Display the buffer on the physical display with a partial update
+            of the screen.
+        """
+        buf = self.screen.buffer_1Gray_Landscape
+        self.screen.display_Landscape_Partial(buf)
+
+    #-- Return ---------------------------------------------------------------------------------------
+        return
+    
     def clear_fb(self, color=0xFF):
         """
             Clears the framebuffer and overwrites it completely with a specified
