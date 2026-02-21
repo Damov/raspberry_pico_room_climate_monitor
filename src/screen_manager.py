@@ -105,12 +105,6 @@ class ScreenManager:
             )
         self.screen_writer.change_font(OpenSansBold_28) #............ Change the font back to the default for the next screen
 
-    #-- Show the buffer in fast mode ----------------------------------
-        self.screen_writer.show()
-
-    #-- Put the display to sleep --------------------------------------
-        self.screen_writer.sleep()
-
     #-- Return --------------------------------------------------------
         return
 
