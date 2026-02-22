@@ -3,6 +3,7 @@ from utime import sleep
 from drivers.screen_waveshare_2p7inch_module import EPD_2in7_V2
 from screen_manager import ScreenManager
 from screen_writer import ScreenWriter
+from logger import Logger
 
 from drivers.SCD41_driver import SCD41
 from drivers.BME280_driver import BME280
@@ -10,6 +11,12 @@ from drivers.BME280_driver import BME280
 from fonts import OpenSansBold_28
 
 def main():
+#-- Initialize the Logger ---------------------------------------------
+    logger_shortterm = Logger(
+            timedelta_seconds = 0.25 * 3600, #... Keep 15 minutes of history
+            dt_seconds = 0.5*60 #................ Bin width of 30 seconds for output
+        )
+    
 #-- Initialize the screen ---------------------------------------------
     epd = EPD_2in7_V2()
 
@@ -44,8 +51,16 @@ def main():
         CO2, temp, hum = sensor_scd41.read_measurement()
         _, pressure, _ = sensor_bme280.read_compensated()
 
+    #-- Log the new sample ------------------------------------------------
+        logger_shortterm.add_sample(
+            pressure = pressure,
+            temperature = temp,
+            humidity = hum,
+            co2 = CO2
+        )
+
     #-- Draw the first screen layout with the example data ----------------
-        screen_manager.screen1(temp, hum, pressure, CO2)
+        screen_manager.screen1(temp, hum, pressure, CO2, logger_shortterm)
 
     #-- Update screen -----------------------------------------------------
         #screen_writer.show()
