@@ -1,5 +1,5 @@
 import machine
-from utime import sleep
+from utime import sleep, time, ticks_ms, ticks_diff
 from drivers.screen_waveshare_2p7inch_module import EPD_2in7_V2
 from screen_manager import ScreenManager
 from screen_writer import ScreenWriter
@@ -11,6 +11,12 @@ from drivers.BME280_driver import BME280
 from fonts import OpenSansBold_28
 
 def main():
+#-- Set time refresh intervals to current time ------------------------
+    last_full = ticks_ms()
+    last_fast = ticks_ms()
+    last_partial = ticks_ms()
+    first_refresh = True
+
 #-- Initialize the Logger ---------------------------------------------
     logger_shortterm = Logger(
             timedelta_seconds = 0.25 * 3600, #... Keep 15 minutes of history
@@ -46,6 +52,12 @@ def main():
             freq=100000
         ) #............................................. Initialize SCD41 sensor
     
+#-- Referesh screen -------------------------------------------------------
+    screen_writer.show() #......................... First full refresh
+    screen_writer.show() #......................... First full refresh
+    screen_writer.show() #......................... First full refresh
+    screen_writer.show() #......................... First full refresh
+    
     while True:
     #-- Get data frm sensors ----------------------------------------------
         CO2, temp, hum = sensor_scd41.read_measurement()
@@ -63,10 +75,31 @@ def main():
         screen_manager.screen1(temp, hum, pressure, CO2, logger_shortterm)
 
     #-- Update screen -----------------------------------------------------
-        #screen_writer.show()
-        #screen_writer.show_fast()
-        screen_writer.show_partial()
-    
+        if first_refresh:
+            screen_writer.show() #......................... First full refresh
+            first_refresh = False
+        else:
+            FULL_INTERVAL_MS    = 15 * 60 * 1000   # 15 min
+            FAST_INTERVAL_MS    = 5  * 60 * 1000   # 5 min
+            PARTIAL_INTERVAL_MS = 5  * 1000        # 5 s
+
+            now = ticks_ms() #................ Current time in ms
+
+            # 1) Every 5 s: partial refresh
+            if ticks_diff(now, last_partial) >= PARTIAL_INTERVAL_MS:
+                last_partial = now
+                screen_writer.show_partial()
+
+            # 2) Every 5 min: fast refresh
+            if ticks_diff(now, last_fast) >= FAST_INTERVAL_MS:
+                last_fast = now
+                screen_writer.show_fast()
+
+            # 3) Every 15 min: full refresh
+            if ticks_diff(now, last_full) >= FULL_INTERVAL_MS:
+                last_full = now
+                screen_writer.show()
+
     #-- Wait before the next update ---------------------------------------
         sleep(5)
         print("Updating screen with new sensor readings...")
