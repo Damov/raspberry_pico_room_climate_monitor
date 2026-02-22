@@ -27,6 +27,13 @@
 # THE SOFTWARE.
 #
 
+# =============================================================================
+#  MODIFICATION HISTORY WITHIN THIS PROJECT
+# -----------------------------------------------------------------------------
+# 2026-02-22 : added method display_Landscape_Fast()
+# 2026-02-22 : added method display_Landscape_Partial()
+# =============================================================================
+
 from machine import Pin, SPI
 import framebuf
 import utime
