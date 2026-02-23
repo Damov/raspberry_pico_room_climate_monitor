@@ -1,6 +1,6 @@
 # Raspberry Pi Pico room climate monitor
 
-A compact system based on the Raspberry Pi Pico designed for monitoring indoor climate conditions. The project integrates a <b>Raspberry Pi Pico</b> microcontroller, a <b>Waveshare 2.7-inch E-Paper display module</b> (264 × 176 pixels), a <b>Waveshare BME280 environmental sensor</b>, and a <b>Hailege SCD41 CO₂ gas sensor</b>. Its purpose is to measure and display room temperature, humidity, atmospheric pressure, and CO₂ concentration. The software architecture is structured to support multiple screen layouts, which can be defined and switched via user input buttons.
+A compact system based on the Raspberry Pi Pico designed for monitoring indoor climate conditions. The project integrates a <b>Raspberry Pi Pico 2 (RP2350)</b> microcontroller, a <b>Waveshare 2.7-inch E-Paper display module</b> (264 × 176 pixels), a <b>Waveshare BME280 environmental sensor</b>, and a <b>Hailege SCD41 CO₂ gas sensor</b>. Its purpose is to measure and display room temperature, humidity, atmospheric pressure, and CO₂ concentration. The software architecture is structured to support multiple screen layouts, which can be defined and switched via user input buttons.
 
 # Screenshots
 
@@ -12,10 +12,20 @@ The following images illustrate the assembly of the system on a breadboard using
 </p>
 
 # Features
-(To be done)
+Shows current
+
+* room temperaturen
+* relative humidity
+* CO2 concentration
+* historic values
+
+The firmware will be extended in future with further functionalities.
 
 # Components
-(To be done)
+* <b>Raspberry Pi Pico 2 (RP2350) with presoldered pin header</b>
+* <b>Waveshare 2.7-inch E-Paper display module</b> (264 × 176 pixels)
+* <b>(Waveshare) BME280 environmental sensor</b>
+* <b>(Hailege) SCD41 CO₂ gas sensor</b>
 
 # Remarks
 
@@ -38,9 +48,7 @@ The <a href="src/drivers/screen_waveshare_2p7inch_module.py"><b>screen_waveshare
 
 # Getting started
 
-## Prerequisites
-
-(To be done!)
+This section describes assembling the hardware and installing the firmware for this system.
 
 ## Assembly
 
@@ -68,7 +76,34 @@ The display is wired using a JST‑to‑Dupont cable (<b>PH2.0, 20 cm, 8‑pin
 
 ## Firmware installation
 
-(To be done!)
+### [1] Install MicroPython firmware on the Raspberry Pi Pico
+
+When you have a completely new Raspberry Pi Pico 2, you will need to flash the MicroPython runtime onto the microcontroller. This is usually a very simple process. You can find an excellent tutorial at
+
+<a href="https://www.raspberrypi.com/documentation/microcontrollers/micropython.html"><b>Flashing the Micropython runtime library on Raspberry Pi Pico</b></a>
+
+The firmware for the Pico 2 version without a Wi‑Fi chip can be downloaded <a href="https://micropython.org/download/RPI_PICO2/RPI_PICO2-latest.uf2"><b>here</b></a>. Once the download is complete, press and hold the <b>BOOTSEL</b> button on the Pico while connecting it to your computer with a USB cable. After it is connected, release the <b>BOOTSEL</b> button - a new flash drive will appear in your computer’s file system. Drag and drop the downloaded firmware file onto this flash drive. When the copying is complete, the Pico will automatically unmount the drive. At this point, the MicroPython runtime has been successfully flashed onto your Raspberry Pi Pico board.
+
+### [2] Installing Thonny editor and connect it with the Raspberry Pi Pico board
+
+I usually use the <a href="https://thonny.org/"><b>Thonny editor</b></a> to transfer Python files onto the Raspberry Pi Pico board. I don’t use the editor for coding, but only to upload files to the board or make quick on‑the‑fly code adjustments.
+
+This <a href="https://projects.raspberrypi.org/en/projects/getting-started-with-the-pico/0"><b>tutorial</b></a> explains the first steps with the Thonny editor and Raspberry Pi Pico very well. Alternatively, this <a href="https://www.youtube.com/watch?v=_ouzuI_ZPLs"><b>YouTube tutorial</b></a> also explains how to use the editor both for coding and for transferring files to the Pico board.
+
+### [3] Downloading and installing the firmware on Raspberry Pi Pico 2
+
+3.1. **Download the repository onto your local hard drive**:
+
+```sh
+   git clone git@github.com:Damov/raspberry_pi_room_climate_screen.git
+```
+
+3.2. **Transfer firmware on the Raspberry Pi Pico 2**:
+
+Open the Thonny editor and select the Pico’s Python interpreter (it will appear in the list once the Pico is connected via a USB cable). In the editor's filesystem window, navigate to the folder on your computer where you cloned the repository. Once inside the repository, enter the subfolder <b>src/</b>. Now select all files from this subfolder, right‑click, and choose <b>Upload to /</b>. This will transfer everything from the <b>src/</b> subfolder to the Pico’s root directory. After the transfer is complete, you can disconnect the Pico from your computer and connect it to a power source using a USB cable. The system should now boot up and run the software.
+
+
+<b>Note:</b> During boot, the MicroPython runtime on the board will look for the file <b>main.py</b> and execute it automatically. You can also run it manually from the Thonny editor. Simply double‑click <b>main.py</b> in the board’s file system. A new window will open showing the code with the title <b>[main.py]</b>. It’s important that the filename appears inside square brackets - this indicates that you’ve opened the file from the board’s storage, not from your computer. When you click the green <b>“Run”</b> button in Thonny, the code will execute directly on the board.
 
 # Todo
 
