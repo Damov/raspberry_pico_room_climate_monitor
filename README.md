@@ -109,11 +109,13 @@ Open the Thonny editor and select the Pico’s Python interpreter (it will appea
 
 * ~~Let the onboard LED blink if there was somewhere an Exception raised and in main() not handeled (to indicated that the device crashed entirely)~~
 * ~~Write an unhandeled exception to the permanent storage of the raspberry pi pico as text file~~
+* Put the code, which updates the screen in try...except block and prevent out of memory exception
+* Redesign the logger class more memory efficient (right now this class is too heavy for PICO's RAM)
+* Define a long‑term logger for at least 24 h of data and create a dedicated screen to plot the history.
 * Define all configuration parameters in a config.ini file and load them at runtime.
+
 * Implement button handling to switch between multiple screen layouts.
 * Add a barometer function and a simple weather forecast based on pressure trends over the last 3 hours.
-* Define a long‑term logger for at least 24 h of data and create a dedicated screen to plot the history.
-* Redesign the logger class more memory efficient (right now this class is too heavy for PICO's RAM)
 * Design a 3D‑printable enclosure and publish the 3D model (e.g. as a download link).
 * Optional: Improve calibration of the sensor readings.
 * Optional: Add a buzzer for acoustic alerts.
