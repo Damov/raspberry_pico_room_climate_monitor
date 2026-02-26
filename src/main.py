@@ -11,6 +11,10 @@ from drivers.BME280_driver import BME280
 from fonts import OpenSansBold_28
 
 def main():
+    """
+        Main function to initialize sensors, logger, and screen,
+        and to continuously read sensor data, log it, and update the screen.
+    """
 #-- Set time refresh intervals to current time ------------------------
     last_full = ticks_ms()
     last_fast = ticks_ms()
