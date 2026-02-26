@@ -1,5 +1,7 @@
 import machine
 from utime import sleep, time, ticks_ms, ticks_diff
+import gc
+
 from drivers.screen_waveshare_2p7inch_module import EPD_2in7_V2
 from screen_manager import ScreenManager
 from screen_writer import ScreenWriter
@@ -9,6 +11,23 @@ from drivers.SCD41_driver import SCD41
 from drivers.BME280_driver import BME280
 
 from fonts import OpenSansBold_28
+
+def print_mem(label=""):
+    """
+        Print the current memory usage (free and allocated) 
+        with an optional label for context.
+
+        This function is useful for debugging memory usage at
+        different points in the code.
+    """
+    #import gc #........................................................ Import garbage collector module to check memory usage
+    #gc.collect() #..................................................... Run garbage collection to free up memory before checking usage
+    print(
+        label,
+        f"alloc: {gc.mem_alloc()}, "
+        f"free: {gc.mem_free()} ({100*gc.mem_free()/(gc.mem_free() + gc.mem_alloc()):.2f}) %"
+    ) #................................................................. Print the label along with free and allocated memory in bytes for debugging purposes
+
 
 def write_exception_to_file(e, file_path="exception.log"):
     """
@@ -98,9 +117,16 @@ def main():
     screen_writer.show() #......................... First full refresh
     
     while True:
+    #-- Garbage collection to free up memory ------------------------------
+        gc.collect() #..................................................... Run garbage collection to free up memory before the next loop iteration
+
     #-- Get data frm sensors ----------------------------------------------
+        print_mem("before loop step")
+
         CO2, temp, hum = sensor_scd41.read_measurement()
         _, pressure, _ = sensor_bme280.read_compensated()
+
+        print_mem("after sensors")
 
     #-- Log the new sample ------------------------------------------------
         logger_shortterm.add_sample(
@@ -109,6 +135,8 @@ def main():
             humidity = hum,
             co2 = CO2
         )
+
+        print_mem("after logger")
 
     #-- Draw the first screen layout with the example data ----------------
         screen_manager.screen1(temp, hum, pressure, CO2, logger_shortterm)
@@ -139,9 +167,13 @@ def main():
                 last_full = now
                 screen_writer.show()
 
+        print_mem("after screen")
+
     #-- Wait before the next update ---------------------------------------
         sleep(5)
         print("Updating screen with new sensor readings...")
+
+        print("\n\n\n")
 
 
 if __name__ == "__main__":
