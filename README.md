@@ -110,7 +110,7 @@ Open the Thonny editor and select the Pico’s Python interpreter (it will appea
 * ~~Let the onboard LED blink if there was somewhere an Exception raised and in main() not handeled (to indicated that the device crashed entirely)~~
 * ~~Write an unhandeled exception to the permanent storage of the raspberry pi pico as text file~~
 * Put the code, which updates the screen in try...except block and prevent out of memory exception
-* Redesign the logger class more memory efficient (right now this class is too heavy for PICO's RAM)
+* ~~Redesign the logger class more memory efficient (right now this class is too heavy for PICO's RAM)~~
 * Define a long‑term logger for at least 24 h of data and create a dedicated screen to plot the history.
 * Define all configuration parameters in a config.ini file and load them at runtime.
 
@@ -135,3 +135,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 # Acknowledgements
 * <a href="https://github.com/peterhinch"><b>Peter Hinch</b></a>: For the writer class used for text rendering and font_to_py for fonts.
 * <a href="https://github.com/waveshareteam/Pico_ePaper_Code"><b>Waveshare</b></a>: For the ePaper display and driver.
+display 
