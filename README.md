@@ -125,6 +125,16 @@ Open the Thonny editor and select the Pico’s Python interpreter (it will appea
 
 * Waveshare display class driver can cause out of memory exception
 
+# Energy consumption
+
+The average power consumption was measured using a USB power meter capable of tracking voltage and current, as shown in the image below:
+
+<p align="center">
+  <img src="images/power_consumption.jpg" width="600" alt="Circuit layout">
+</p>
+
+Over a period of 1 hour and 32 minutes, the device consumed <b>222 mWh</b> of energy. This corresponds to an average power consumption of <b>144 mW<B7> and an average current draw of <b>28.7 mA</b>. With an 1800 mAh LiPo battery, the device would operate for approximately 2 days and 12 hours. Therefore, for a stationary home installation, it is more practical to power the device directly via a USB wall adapter.
+
 # Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
