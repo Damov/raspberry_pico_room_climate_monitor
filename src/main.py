@@ -130,9 +130,6 @@ def main():
     
 #-- Referesh screen -------------------------------------------------------
     screen_writer.show() #......................... First full refresh
-    screen_writer.show() #......................... First full refresh
-    screen_writer.show() #......................... First full refresh
-    screen_writer.show() #......................... First full refresh
     
     while True:
     #-- Garbage collection to free up memory ------------------------------
@@ -198,8 +195,7 @@ def main():
     #-- Wait before the next update ---------------------------------------
         sleep(5)
         print("Updating screen with new sensor readings...")
-
-        print("\n\n\n")
+        print("-" * 50)
 
 
 if __name__ == "__main__":
