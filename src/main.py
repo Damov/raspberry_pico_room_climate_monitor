@@ -76,11 +76,29 @@ def main():
     first_refresh = True
 
 #-- Initialize the Logger ---------------------------------------------
-    logger_shortterm = Logger(
-            timedelta_seconds = 0.25 * 3600, #... Keep 15 minutes of history
-            dt_seconds = 0.5*60 #................ Bin width of 30 seconds for output
+    MAX_BIN_HISTORY = 0.25 * 3600 #........................ Keep 15 minutes of history in seconds
+    BIN_TIMESPAN    = 0.5 * 60 #........................... Bin width of 30 seconds for output in seconds
+
+    logger_pressure_shortterm = Logger(
+            max_bin_history = MAX_BIN_HISTORY, #.. Keep 15 minutes of history
+            bin_timespan = BIN_TIMESPAN #........... Bin width of 30 seconds for output
         )
-    
+
+    logger_temperature_shortterm = Logger(
+            max_bin_history = MAX_BIN_HISTORY, #.. Keep 15 minutes of history
+            bin_timespan = BIN_TIMESPAN #........... Bin width of 30 seconds for output
+        )
+
+    logger_humidity_shortterm = Logger(
+            max_bin_history = MAX_BIN_HISTORY, #.. Keep 15 minutes of history
+            bin_timespan = BIN_TIMESPAN #........... Bin width of 30 seconds for output
+        )
+
+    logger_co2_shortterm = Logger(
+            max_bin_history = MAX_BIN_HISTORY, #.. Keep 15 minutes of history
+            bin_timespan = BIN_TIMESPAN #........... Bin width of 30 seconds for output
+        )
+
 #-- Initialize the screen ---------------------------------------------
     epd = EPD_2in7_V2()
 
@@ -128,18 +146,26 @@ def main():
 
         print_mem("after sensors")
 
-    #-- Log the new sample ------------------------------------------------
-        logger_shortterm.add_sample(
-            pressure = pressure,
-            temperature = temp,
-            humidity = hum,
-            co2 = CO2
-        )
+    #-- Add new samples to the loggers ------------------------------------
+        now_timestamp = ticks_ms() #............................. Current time in ms
+
+        logger_pressure_shortterm.add(now_timestamp, pressure) #. Add new pressure sample to the short-term logger
+        logger_temperature_shortterm.add(now_timestamp, temp) #.. Add new temperature sample to the short-term logger
+        logger_humidity_shortterm.add(now_timestamp, hum) #...... Add new humidity sample to the short-term logger
+        logger_co2_shortterm.add(now_timestamp, CO2) #........... Add new CO2 sample to the short-term logger
 
         print_mem("after logger")
 
     #-- Draw the first screen layout with the example data ----------------
-        screen_manager.screen1(temp, hum, pressure, CO2, logger_shortterm)
+        screen_manager.screen1(
+                    temp,
+                    hum,
+                    pressure,
+                    CO2,
+                    logger_temperature_shortterm,
+                    logger_humidity_shortterm,
+                    logger_co2_shortterm
+                ) #.............................................. Draw the first screen layout with the latest sensor readings and loggers for short-term history
 
     #-- Update screen -----------------------------------------------------
         if first_refresh:

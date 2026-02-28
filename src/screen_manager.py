@@ -16,7 +16,16 @@ class ScreenManager:
     #-- Return --------------------------------------------------------
         return
     
-    def screen1(self, temp, hum, pressure, CO2, logger):
+    def screen1(
+            self,
+            temp,
+            hum,
+            pressure,
+            CO2,
+            logger_temperature_shortterm,
+            logger_humidity_shortterm,
+            logger_co2_shortterm
+        ):
         """
             Draws the first screen layout with the given data.
 
@@ -30,9 +39,15 @@ class ScreenManager:
                     Pressure in hPa
                 CO2: float
                     CO2 concentration in ppm
-                logger: Logger
+                logger_temperature_shortterm: Logger
                     Logger instance to retrieve historical data 
-                    for the barplot
+                    for the pressure
+                logger_humidity_shortterm: Logger
+                    Logger instance to retrieve historical data 
+                    for the humidity
+                logger_co2_shortterm: Logger
+                    Logger instance to retrieve historical data 
+                    for the CO2
             
             Returns:
             --------
@@ -119,7 +134,7 @@ class ScreenManager:
         x_scr_max = 120
         y_scr_max = 53
 
-        samples = logger.get_temperature()
+        samples = logger_temperature_shortterm.bin_series()
 
         self.draw_barplot(
                 x_scr_min,
@@ -145,7 +160,7 @@ class ScreenManager:
         x_scr_max = 120
         y_scr_max = 108
 
-        samples = logger.get_humidity()
+        samples = logger_humidity_shortterm.bin_series()
 
         self.draw_barplot(
                 x_scr_min,
@@ -171,7 +186,7 @@ class ScreenManager:
         x_scr_max = 120
         y_scr_max = 166
 
-        samples = logger.get_co2()
+        samples = logger_co2_shortterm.bin_series()
 
         self.draw_barplot(
                 x_scr_min,
@@ -189,7 +204,6 @@ class ScreenManager:
     #-- Return --------------------------------------------------------
         return
 
-
     def draw_barplot(
             self,
             x_scr_min, y_scr_min,
@@ -206,22 +220,17 @@ class ScreenManager:
         accordingly and separated by a 1px white line. Values outside the
         [y_min,y_max] logical range are cropped to the physical box.
         """
-        fb = self.screen_writer.fb
+        fb = self.screen_writer.fb #...................................... Get the frame buffer from the screen writer
+        #samples = samples[::-1] #........................................ Reverse the samples to have the most recent one at the end of the list
+
 
     #-- Invert bar along x-axis ----------------------------------------------
         x_min = -x_max
         x_max =  0.
         samples = [(-x, y) for (x, y) in samples] #..... Invert x values to have 0 at the right and positive values to the left
-    
-    #-- Get dT and compute dX of a bar ---------------------------------------
-        bar_dT = samples[0][0] #......................................... dT
-        if bar_dT <= 0:
-            bar_dT = -bar_dT
-        bar_dX = (x_scr_max - x_scr_min) / (x_max - x_min) * bar_dT  #... dX in screen coords for the given dT
-        bar_dX = int(bar_dX) + 2 #....................................... Convert to int and leave 1px for white separator between bars
 
-    #-- Iterate over samples and plot bars -----------------------------------
-        def map_x_value(x_value):
+    #-- Functions to map logical x/y values to screen coordinates --------------------------------------
+        def _map_x_value(x_value):
             # Map logical x value to screen x coordinate
             if x_value < x_min:
                 return x_scr_min
@@ -229,7 +238,8 @@ class ScreenManager:
                 return x_scr_max
             else:
                 return int(x_scr_min + (x_value - x_min) / (x_max - x_min) * (x_scr_max - x_scr_min))
-        def map_y_value(y_value):
+            
+        def _map_y_value(y_value):
             # Map logical y value to screen y coordinate (inverted)
             if y_value < y_min:
                 return y_scr_max
@@ -237,30 +247,37 @@ class ScreenManager:
                 return y_scr_min
             else:
                 return int(y_scr_max - (y_value - y_min) / (y_max - y_min) * (y_scr_max - y_scr_min))
+            
+    #-- Iterate over samples and plot bars -------------------------------------------------------------
+        for k in range(len(samples)):
+        #-- Select physical x values for the left and right edge of the bar ----------------------------
+            if k < 1:
+                x_value_left = 0 #................. For the first bar, we can set the left edge to the start of the x range
+            else:
+                x_value_left = samples[k-1][0] #... Phsyical x value in seconds ago for the left edge of the bar (previous sample)
+            x_value_right = samples[k][0] #........ Phsyical x value in seconds ago for the right edge of the bar (current sample)
+
+        #-- Select physical y value of the bar ---------------------------------------------------------
+            y_value = samples[k][1] #.............. Physical y value in the given units for the current sample
         
-        for sample in samples:
-            x_value = sample[0] #....................... Phsyical x value in seconds ago
-            y_value = sample[1] #....................... Physical y value in the given units
+        #-- Convert logical x/y values to screen coordinates for the bar edges -------------------------
+            x_bar_left   = _map_x_value(x_value_left) #.. Map logical x to screen x for the left edge of the bar
+            x_bar_right  = _map_x_value(x_value_right) #. Map logical x to screen x for the left edge of the bar
+            y_bar        = _map_y_value(y_value) #....... Map logical y to screen y for the top of the bar (inverted because screen y increases downwards)
 
-            x_bar_start = map_x_value(x_value) #........ Map logical x to screen x for the left edge of the bar
-            x_bar_end   = x_bar_start + bar_dX #........ Right edge of the bar is start + bar width in screen coords
-            y_bar_top   = map_y_value(y_value) #........ Map logical y to screen y for the top of the bar (inverted because screen y increases downwards)
-            y_bar_bottom = y_scr_max #.................. Bottom of the bar is at y_scr_max
-
-            # Draw filled bar
-            for x in range(x_bar_start, x_bar_end + 1):
-                fb.vline(x, y_bar_top, y_bar_bottom - y_bar_top + 1, color)
-
-    #-- Plot white vertical bars --------------------------------------
-        for sample in samples:
-            x_value = sample[0] #....................... Phsyical x value in seconds ago
-            x_bar_start = map_x_value(x_value) #........ Map logical x to screen x for the left edge of the bar
-            fb.vline(
-                x_bar_start,
-                y_scr_min,
-                y_scr_max - y_scr_min + 1,
-                0xFF
+        #-- Draw filled bar as a rectangle -------------------------------------------------------------
+            fb.rect(
+                x_bar_left,
+                y_bar,
+                x_bar_right-x_bar_left,
+                y_scr_max - y_bar,
+                color,
+                True
             )
+        
+        #-- Plot white vertical bars to separate the bars ------------------------------------------------
+            fb.vline(x_bar_right, y_scr_min, y_scr_max, 0xFF)
+            fb.vline(x_bar_left, y_scr_min, y_scr_max, 0xFF)
 
     #-- Plot 5 bars ---------------------------------------------------
         N = 5
@@ -269,18 +286,7 @@ class ScreenManager:
             y = int(y_scr_min + i * dY)
             fb.hline(x_scr_min, y, x_scr_max - x_scr_min + 1, 0xFF)
 
-    #-- Draw white rectangle around the barplot -----------------------
-        """
-        fb.rect(
-            x_scr_min,
-            y_scr_min,
-            x_scr_max - x_scr_min + 1,
-            y_scr_max - y_scr_min + 1,
-            0xFF
-        )
-        """
-
-    #-- Return --------------------------------------------------------
+    #-- Return -----------------------------------------------------------------------------------------
         return
 
 # + ==================================================================== +
