@@ -2,19 +2,52 @@ import time
 
 class Logger:
     """
-    Logger for time-series sensor data. Maintains a history of samples within a specified
-    time window and provides binned averages for plotting. Designed for use in a microcontroller
-    environment with limited resources. Handles time using ticks_ms and accounts for wrap-around.
+        Logger class for single scalar time-series data. This class allows you to log scalar
+        values (e.g., pressure, temperature, etc.) over time, with automatic binning of values
+        into specified time intervals.
+
+        Attributes:
+        -----------
+            max_bin_history: float
+                Length of the history window in seconds (e.g., 3600 for 1 hour)
+            bin_timespan: float
+                Bin width for output in seconds (e.g., 60 for 1-minute bins)
+            bin_hst_timestamp: list
+                List of bin left timestamps in milliseconds
+            bin_hst_values: list
+                List of average values for each bin
+            current_bin_start: int or None
+                Start timestamp of the current bin in milliseconds, or None if no bin is active
+            current_bin_value_sum: float
+                Sum of values in the current bin
+            current_bin_value_count: int
+                Count of values in the current bin
+        
+        Methods:
+        --------
+            __init__(self, max_bin_history, bin_timespan):
+                Initializes the Logger with specified history length and bin width.
+            add(self, timestamp, new_value):
+                Adds a new scalar value with its timestamp to the Logger, handling binning and history management.
+            _remove_old(self, now):
+                Removes bins that are older than the specified history length from the current time.
+            bin_series(self):
+                Returns the historic bin series values as a list of [dt_seconds_ago, avg_value] pairs for plotting.
+
+        Raises:
+        -------
+            TypeError: If max_bin_history or bin_timespan is not a number.
+            ValueError: If max_bin_history or bin_timespan is not positive.
     """
-    def __init__(self, timedelta_seconds, dt_seconds):
+    def __init__(self, max_bin_history, bin_timespan):
         """
             Initialize the Logger.
 
             Arguments:
             ----------
-                timedelta_seconds: float
+                max_bin_history: float
                     Length of the history window in seconds (e.g., 3600 for 1 hour)
-                dt_seconds: float
+                bin_timespan: float
                     Bin width for output in seconds (e.g., 60 for 1-minute bins)
             
             Returns:
@@ -22,167 +55,162 @@ class Logger:
                 None
                    This function initializes the Logger and does not return any value.
         """
-    #-- Save attributes ------------------------------------------------
-        self.timedelta_ms = int(timedelta_seconds * 1000)
-        self.dt_ms = int(dt_seconds * 1000)
-    #-- Internal data storage ------------------------------------------
-        self._data = [] #................ list of dicts: {"t": ticks_ms, "p":..., "tC":..., "h":..., "co2":...}
-    #-- Return ---------------------------------------------------------
-        return
+    #-- Validate input parameters ----------------------------------------------------
+        if not isinstance(max_bin_history, (int, float)):
+            raise TypeError("max_bin_history must be a number")
+        if not isinstance(bin_timespan, (int, float)):
+            raise TypeError("bin_timespan must be a number")
+        
+        if max_bin_history <= 0:
+            raise ValueError("max_bin_history must be positive")
+        if bin_timespan <= 0:
+            raise ValueError("bin_timespan must be positive")
+        
+    #-- Create internal attributes ---------------------------------------------------
+        max_bin_history = float(max_bin_history * 1000) #.... convert total timespan of bin history to ms
+        bin_timespan    = float(bin_timespan * 1000) #....... convert single bin timespan to ms
 
-    def add_sample(self, pressure, temperature, humidity, co2):
+        self.max_bin_history = max_bin_history #............. save total timespan of bin history in ms
+        self.bin_timespan    = bin_timespan #................ save single bin timespan in ms
+    
+    #-- Create longterm storage attributes -------------------------------------------
+        self.bin_hst_timestamp = list() #.................... list of bin left timestamps in ms
+        self.bin_hst_values    = list() #.................... list of lists of values for each bin
+
+    #-- Create current bin accumulators ----------------------------------------------
+        self.current_bin_start       = None # ............... start timestamp of the current bin in ms
+        self.current_bin_value_sum   = 0.0 #................. sum of values in the current bin
+        self.current_bin_value_count = 0 #................... count of values in the current bin
+    
+    #-- Return -----------------------------------------------------------------------
+        return
+    
+    def add(self, timestamp, new_value):
         """
-            Add a new sample of sensor data with the current timestamp.
+            Add a new scalar value and a current reference timestamp to
+            the Logger.
 
             Arguments:
             ----------
-                pressure: float
-                    Pressure in hPa
-                temperature: float
-                    Temperature in Celsius
-                humidity: float
-                    Humidity in percentage
-                co2: float
-                    CO2 concentration in ppm (parts per million)
+                timestamp: int
+                    The timestamp of the value in milliseconds since epoch
+                    (or any consistent time unit, default can be created
+                    with time.ticks_ms() ).
+                new_value: float
+                    The scalar value to be logged (e.g., pressure, temperature, etc.)
             
             Returns:
             --------
                 None
-                   This function adds a new sample to the Logger
-                   and does not return any value.
+                   This function adds a new value to the Logger and does not
+                   return any value.
         """
-        now = time.ticks_ms() #...................... Current time in ms
-        self._data.append({
-                    "t": now,
-                    "p": pressure,
-                    "tC": temperature,
-                    "h": humidity,
-                    "co2": co2,
-                }) #................................. Add new sample to data list
-        self._prune_old(now) #....................... Remove old samples outside the time window
-    #-- Return ---------------------------------------------------------
+        #now = time.ticks_ms() #...................... Current time in ms
+    
+    #-- If this is the first value, initialize the current bin ---------------------
+        if self.current_bin_start is None:
+            self.current_bin_start = timestamp
+
+    #-- Check if we need to start a new bin ----------------------------------------
+        if time.ticks_diff(timestamp, self.current_bin_start) >= self.bin_timespan:
+        #-- Close the current bin --------------------------------------------------
+            if self.current_bin_value_count > 0:
+                avg_value = self.current_bin_value_sum \
+                          / self.current_bin_value_count #.......... Calculate average value for the completed bin if count > 0
+            else:
+                avg_value = 0.0 #................................... Save 0 if count = 0
+
+            self.bin_hst_values.append(avg_value) #................. Add the average value of the completed bin to the list
+            self.bin_hst_timestamp.append(self.current_bin_start) #. Add the start timestamp of the completed bin to the list
+        
+        #-- Start a new bin --------------------------------------------------------
+            self.current_bin_start       = timestamp #.............. Start timestamp of the new bin as current time
+            self.current_bin_value_sum   = 0.0 #.................... Reset sum for the new bin
+            self.current_bin_value_count = 0 #...................... Reset count for the new bin
+
+    #-- Add the new value to the current bin ---------------------------------------
+        self.current_bin_value_sum   += new_value
+        self.current_bin_value_count += 1
+
+    #-- Remove old bins that are outside the total timespan ------------------------
+        self._remove_old(timestamp)
+    
+    #-- Return ---------------------------------------------------------------------
         return
 
-    def _prune_old(self, now):
+    def _remove_old(self, now):
         """
-            Remove samples older than timedelta_ms from now.
+            Remove bins which are older than the total time span
+            (self.max_bin_history) from the current time (now).
 
             Arguments:
             ----------
                 now: int
-                    Current time in ticks_ms
+                    Current time in ms, default is time.ticks_ms()
             
             Returns:
             --------
                 None
-                   This function prunes old samples from the Logger
+                   This function removes old bins from the Logger
                    and does not return any value.
         """
-        cutoff = time.ticks_add(now, -self.timedelta_ms) #..... Calculate cutoff time; samples older than this should be removed
-    #-- Iterate through data and keep only samples newer than cutoff ---
-        i = 0
-        n = len(self._data)
+        cutoff = time.ticks_add(now, -int(self.max_bin_history)) #. Calculate cutoff time. Bins older than this should be removed
+
+    #-- Iterate through data, keep only samples newer than cutoff timestamp --------
+        i = 0 #.................................................. index for iterating through samples
+        n = len(self.bin_hst_timestamp) #........................ total number of bins currently stored
+
         while i < n:
-            # Calculate age of sample in ms using ticks_diff to handle wrap-around
-            age_ms = time.ticks_diff(self._data[i]["t"], cutoff)
-            # if sample time < cutoff, ticks_diff will be negative
+        #-- Calculate age of sample in ms using ticks_diff to handle wrap-around ---
+            age_ms = time.ticks_diff(self.bin_hst_timestamp[i], cutoff)
+
+        #-- If sample time < cutoff, ticks_diff will be negative -------------------
             if age_ms < 0:
                 i += 1
             else:
                 break
-        if i > 0:
-            self._data = self._data[i:]
-    #-- Return ---------------------------------------------------------
-        return
 
-    def _bin_series(self, key):
+    #-- Remove old samples by slicing the list --------------------------------------
+        if i > 0:
+            self.bin_hst_timestamp = self.bin_hst_timestamp[i:] #.............. Remove old timestamps from the list
+            self.bin_hst_values    = self.bin_hst_values[i:] #................. Remove old values from the list
+
+    #-- Return ----------------------------------------------------------------------
+        return
+    
+    def bin_series(self):
         """
-            Return [[dt_seconds_ago, avg_value], ...] for a given field key.
-            
-            Arguments:
-            ----------
-                key: str
-                    One of "p", "tC", "h", "co2" corresponding to pressure,
-                    temperature, humidity, and CO2.
+            Returns the historic bin series values.
             
             Returns:
             --------
-                list of [dt_seconds_ago, avg_value]
-                    A list of pairs where dt_seconds_ago is the age of the
-                    bin center in seconds (0 for now, positive for past)
-                    and avg_value is the average of the specified key for
-                    samples in that bin. Bins are of width dt_seconds and
-                    cover the last timedelta_seconds.
+                list of [dt_seconds_ago, avg_value] pairs
+                    A list of pairs where dt_seconds_ago is the age of the bin center
+                    in seconds (0 for now, positive  for past) and  avg_value is  the
+                    average of the specified key for samples  in that particular bin.
+                    Bins  are of width dt_seconds and cover the last timedelta_seconds.
         """
-        if not self._data:
-            return []
+        now_timestamp = time.ticks_ms() #.................................. Current time in ms
+    #-- Create new data structure for binned series ---------------------------------
+        bin_series = list() #.............................................. List of [dt_seconds_ago, avg_value] pairs for plotting
+        for i in range(len(self.bin_hst_timestamp)):
+            bin_start = self.bin_hst_timestamp[i] #........................ Start timestamp of the bin in ms
+            avg_value = self.bin_hst_values[i] #........................... Average value for the bin
+            dt_seconds_ago = time.ticks_diff(now_timestamp, bin_start) #... Age of the bin center in ms (positive for past)
+            dt_seconds_ago = dt_seconds_ago / 1000 #....................... Convert age to seconds
+            bin_series.append([dt_seconds_ago, avg_value]) #............... Add the pair to the series list
 
-        now = time.ticks_ms() #...................... Current time in ms
+    #-- Add the current bin if it has any values ------------------------------------
+        if self.current_bin_value_count > 0:
+            dt_seconds_ago = time.ticks_diff(now_timestamp, self.current_bin_start) #.. Age of the current bin center in ms
+            dt_seconds_ago = dt_seconds_ago / 1000 #................................... Convert age to seconds
+            avg_value = self.current_bin_value_sum / self.current_bin_value_count #.... Average value for the current bin
+            bin_series.append([dt_seconds_ago, avg_value]) #........................... Add the current bin to the series list
+    
+    #-- Convert everything to integer -----------------------------------------------
+        for i in range(len(bin_series)):
+            bin_series[i][0] = int(bin_series[i][0]) #............. Convert age to integer seconds
+            bin_series[i][1] = int(bin_series[i][1]) #............. Convert average value to integer
 
-        # Compute age in ms for each sample (0 for newest, positive for older)
-        # age_ms = now - t_sample, using ticks_diff to handle wrap-around.
-        ages = [time.ticks_diff(now, s["t"]) for s in self._data]
-
-        # Oldest and newest ages
-        oldest_age = ages[0]
-        newest_age = ages[-1]
-
-        # We want bins from age=0 (now) up to age=timedelta_ms, in steps of
-        # dt_ms. But data may not fill all bins.
-        max_age = min(self.timedelta_ms, oldest_age)
-        n_bins = max_age // self.dt_ms + 1
-
-        # Prepare accumulators
-        sums = [0.0] * n_bins
-        counts = [0] * n_bins
-
-        # Assign each sample to a bin based on age
-        for age_ms, s in zip(ages, self._data):
-            if age_ms < 0 or age_ms > self.timedelta_ms:
-                continue  # should not happen if pruning works, but be safe
-            bin_index = age_ms // self.dt_ms
-            if bin_index >= n_bins:
-                continue
-            sums[bin_index] += s[key]
-            counts[bin_index] += 1
-
-        # Build result: timedelta in seconds (from now), average value
-        result = []
-        for i in range(n_bins):
-            if counts[i] == 0:
-                continue  # skip empty bins; alternatively, emit None or 0
-            # bin center age in ms, from now
-            bin_age_center_ms = i * self.dt_ms + self.dt_ms // 2
-            dt_sec = bin_age_center_ms / 1000.0
-            avg_val = sums[i] / counts[i]
-            result.append([dt_sec, avg_val])
-
-        return result
-
-    def get_pressure(self):
-        """
-            Returns pressure data as a binned list of
-            [dt_seconds_ago, avg_pressure] pairs for plotting.
-        """
-        return self._bin_series("p")
-
-    def get_temperature(self):
-        """
-            Returns temperature data as a binned list of
-            [dt_seconds_ago, avg_temperature] pairs for plotting.
-        """
-        return self._bin_series("tC")
-
-    def get_humidity(self):
-        """
-            Returns humidity data as a binned list of
-            [dt_seconds_ago, avg_humidity] pairs for plotting.
-        """
-        return self._bin_series("h")
-
-    def get_co2(self):
-        """
-            Returns CO2 data as a binned list of
-            [dt_seconds_ago, avg_co2] pairs for plotting.
-        """
-        return self._bin_series("co2")
+    #-- Return the complete bin series for plotting ---------------------------------
+        return bin_series
