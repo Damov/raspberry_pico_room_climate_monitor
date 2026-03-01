@@ -81,7 +81,7 @@ class Logger:
         self.current_bin_start       = None # ............... start timestamp of the current bin in ms
         self.current_bin_value_sum   = 0.0 #................. sum of values in the current bin
         self.current_bin_value_count = 0 #................... count of values in the current bin
-    
+
     #-- Return -----------------------------------------------------------------------
         return
     
@@ -178,9 +178,14 @@ class Logger:
     #-- Return ----------------------------------------------------------------------
         return
     
-    def bin_series(self):
+    def bin_series(self, convert_to_int=True):
         """
             Returns the historic bin series values.
+
+            Arguments:
+            ----------
+                convert_to_int: bool
+                    If True, converts the age values to integers for plotting.
             
             Returns:
             --------
@@ -208,9 +213,80 @@ class Logger:
             bin_series.append([dt_seconds_ago, avg_value]) #........................... Add the current bin to the series list
     
     #-- Convert everything to integer -----------------------------------------------
-        for i in range(len(bin_series)):
-            bin_series[i][0] = int(bin_series[i][0]) #............. Convert age to integer seconds
-            bin_series[i][1] = int(bin_series[i][1]) #............. Convert average value to integer
+        if convert_to_int:
+            for i in range(len(bin_series)):
+                bin_series[i][0] = int(bin_series[i][0]) #............. Convert age to integer seconds
+                #bin_series[i][1] = int(bin_series[i][1]) #............. Convert average value to integer
 
     #-- Return the complete bin series for plotting ---------------------------------
         return bin_series
+    
+    def count(self):
+        """
+            Returns the total count of values currently stored in the Logger, including the current bin.
+
+            Returns:
+            --------
+                int
+                    Total count of values currently stored in the Logger, including the current bin.
+        """
+        return len(self.bin_series())
+    
+    def mean(self):
+        """
+            Returns the mean of the values currently stored in the Logger, including the current bin.
+
+            Returns:
+            --------
+                float
+                    Mean of the values currently stored in the Logger, including the current bin.
+        """
+        history = self.bin_series() #........................... Get the binned series of values
+        total_sum = sum([value for (dt, value) in history]) #... Sum of all average values in the bins
+        total_count = len(history) #............................ Count of bins in the history
+        if total_count > 0:
+            return total_sum / total_count #.................... Calculate and return the mean value
+        else:
+            return None #....................................... Return None if there are no values in the history
+        
+    def min(self):
+        """
+            Returns the minimum value currently stored in the Logger, including the current bin.
+
+            Returns:
+            --------
+                float
+                    Minimum value currently stored in the Logger, including the current bin.
+        """
+        history = self.bin_series() #........................... Get the binned series of values
+        if len(history) > 0:
+            return min([value for (dt, value) in history]) #.... Calculate and return the minimum value
+        else:
+            return None #....................................... Return None if there are no values in the history
+
+    def max(self):
+        """
+            Returns the maximum value currently stored in the Logger, including the current bin.
+
+            Returns:
+            --------
+                float
+                    Maximum value currently stored in the Logger, including the current bin.
+        """
+        history = self.bin_series() #........................... Get the binned series of values
+        if len(history) > 0:
+            return max([value for (dt, value) in history]) #.... Calculate and return the maximum value
+        else:
+            return None #....................................... Return None if there are no values in the history
+    
+    def max_bin_history_sec(self):
+        """
+            Returns the maximum bin history length in seconds.
+
+            Returns:
+            --------
+                float
+                    Maximum bin history length in seconds.
+        """
+        return self.max_bin_history / 1000 #.................... Convert max_bin_history from ms to seconds and return it
+    
