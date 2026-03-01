@@ -75,28 +75,52 @@ def main():
     last_partial = ticks_ms()
     first_refresh = True
 
-#-- Initialize the Logger ---------------------------------------------
-    MAX_BIN_HISTORY = 0.25 * 3600 #........................ Keep 15 minutes of history in seconds
-    BIN_TIMESPAN    = 0.5 * 60 #........................... Bin width of 30 seconds for output in seconds
+#-- Initialize the short-term Logger ----------------------------------
+    MAX_BIN_HISTORY = 0.25 * 3600 #............... Keep 15 minutes of history in seconds
+    BIN_TIMESPAN    = 0.5 * 60 #.................. Bin width of 30 seconds for output in seconds
 
     logger_pressure_shortterm = Logger(
             max_bin_history = MAX_BIN_HISTORY, #.. Keep 15 minutes of history
-            bin_timespan = BIN_TIMESPAN #........... Bin width of 30 seconds for output
+            bin_timespan = BIN_TIMESPAN #......... Bin width of 30 seconds for output
         )
 
     logger_temperature_shortterm = Logger(
             max_bin_history = MAX_BIN_HISTORY, #.. Keep 15 minutes of history
-            bin_timespan = BIN_TIMESPAN #........... Bin width of 30 seconds for output
+            bin_timespan = BIN_TIMESPAN #......... Bin width of 30 seconds for output
         )
 
     logger_humidity_shortterm = Logger(
             max_bin_history = MAX_BIN_HISTORY, #.. Keep 15 minutes of history
-            bin_timespan = BIN_TIMESPAN #........... Bin width of 30 seconds for output
+            bin_timespan = BIN_TIMESPAN #......... Bin width of 30 seconds for output
         )
 
     logger_co2_shortterm = Logger(
             max_bin_history = MAX_BIN_HISTORY, #.. Keep 15 minutes of history
-            bin_timespan = BIN_TIMESPAN #........... Bin width of 30 seconds for output
+            bin_timespan = BIN_TIMESPAN #......... Bin width of 30 seconds for output
+        )
+
+#-- Initialize the 24h-term Logger ----------------------------------
+    MAX_BIN_HISTORY = 24 * 3600 #................. Keep 24 hours of history in seconds
+    BIN_TIMESPAN    = 15 * 60 #................... Bin width of 15 minutes for output in seconds
+
+    logger_pressure_24h = Logger(
+            max_bin_history = MAX_BIN_HISTORY, #.. Keep 24 hours of history
+            bin_timespan = BIN_TIMESPAN #......... Bin width of 30 minutes for output
+        )
+
+    logger_temperature_24h = Logger(
+            max_bin_history = MAX_BIN_HISTORY, #.. Keep 24 hours of history
+            bin_timespan = BIN_TIMESPAN #......... Bin width of 30 minutes for output
+        )
+
+    logger_humidity_24h = Logger(
+            max_bin_history = MAX_BIN_HISTORY, #.. Keep 24 hours of history
+            bin_timespan = BIN_TIMESPAN #......... Bin width of 30 minutes for output
+        )
+
+    logger_co2_24h = Logger(
+            max_bin_history = MAX_BIN_HISTORY, #.. Keep 24 hours of history
+            bin_timespan = BIN_TIMESPAN #......... Bin width of 30 minutes for output
         )
 
 #-- Initialize the screen ---------------------------------------------
@@ -151,9 +175,15 @@ def main():
         logger_humidity_shortterm.add(now_timestamp, hum) #...... Add new humidity sample to the short-term logger
         logger_co2_shortterm.add(now_timestamp, CO2) #........... Add new CO2 sample to the short-term logger
 
+        logger_pressure_24h.add(now_timestamp, pressure) #....... Add new pressure sample to the short-term logger
+        logger_temperature_24h.add(now_timestamp, temp) #........ Add new temperature sample to the 24h logger
+        logger_humidity_24h.add(now_timestamp, hum) #............ Add new humidity sample to the 24h logger
+        logger_co2_24h.add(now_timestamp, CO2) #................. Add new CO2 sample to the 24h logger
+
         print_mem("after logger")
 
     #-- Draw the first screen layout with the example data ----------------
+        """
         screen_manager.screen1(
                     temp,
                     hum,
@@ -163,6 +193,9 @@ def main():
                     logger_humidity_shortterm,
                     logger_co2_shortterm
                 ) #.............................................. Draw the first screen layout with the latest sensor readings and loggers for short-term history
+        """
+
+        screen_manager.screen2_temperature(temp, logger_temperature_24h)
 
     #-- Update screen -----------------------------------------------------
         if first_refresh:
@@ -199,16 +232,19 @@ def main():
 
 
 if __name__ == "__main__":
+#-- Define on-board LED pin -----------------------------------------------
+    error_led = machine.Pin("LED", machine.Pin.OUT) #................. On‑board LED (Pico default)
+
+#-- Start execution of the main function and handle exceptions ------------
     try:
-        main()
+        error_led.value(1) #.......................................... Turn on the error LED
+        main() #...................................................... Start the main function
     except Exception as e:
     #-- Write Exception to file -------------------------------------------
         file_path = "exception.log"
         write_exception_to_file(e, file_path=file_path)
 
     #-- Blink the LED to indicate an error --------------------------------
-        error_led = machine.Pin("LED", machine.Pin.OUT) #................. On‑board LED (Pico default)
-
         while True:
             dT_interval = 0.5 # seconds
             error_led.value(1)
