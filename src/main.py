@@ -199,16 +199,19 @@ def main():
 
 
 if __name__ == "__main__":
+#-- Define on-board LED pin -----------------------------------------------
+    error_led = machine.Pin("LED", machine.Pin.OUT) #................. On‑board LED (Pico default)
+
+#-- Start execution of the main function and handle exceptions ------------
     try:
-        main()
+        error_led.value(1) #.......................................... Turn on the error LED
+        main() #...................................................... Start the main function
     except Exception as e:
     #-- Write Exception to file -------------------------------------------
         file_path = "exception.log"
         write_exception_to_file(e, file_path=file_path)
 
     #-- Blink the LED to indicate an error --------------------------------
-        error_led = machine.Pin("LED", machine.Pin.OUT) #................. On‑board LED (Pico default)
-
         while True:
             dT_interval = 0.5 # seconds
             error_led.value(1)
