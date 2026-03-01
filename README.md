@@ -111,7 +111,7 @@ Open the Thonny editor and select the Pico’s Python interpreter (it will appea
 * ~~Write an unhandeled exception to the permanent storage of the raspberry pi pico as text file~~
 * Put the code, which updates the screen in try...except block and prevent out of memory exception
 * ~~Redesign the logger class more memory efficient (right now this class is too heavy for PICO's RAM)~~
-* Define a long‑term logger for at least 24 h of data and create a dedicated screen to plot the history.
+* ~~Define a long‑term logger for at least 24 h of data~~ and create a dedicated screen to plot the history (not all screens are defined yet).
 * Define all configuration parameters in a config.ini file and load them at runtime.
 
 * Implement button handling to switch between multiple screen layouts.
