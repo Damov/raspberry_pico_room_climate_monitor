@@ -2,7 +2,7 @@ import machine
 from drivers.screen_waveshare_2p7inch_module import EPD_2in7_V2
 from screen_writer import ScreenWriter
 
-from fonts import OpenSansBold_20, OpenSansBold_28 #..... Load fonts
+from fonts import OpenSansBold_12, OpenSansBold_20, OpenSansBold_28 #..... Load fonts
 
 class ScreenManager:
     """
@@ -15,7 +15,7 @@ class ScreenManager:
     
     #-- Return --------------------------------------------------------
         return
-    
+
     def screen1(
             self,
             temp,
@@ -204,6 +204,258 @@ class ScreenManager:
     #-- Return --------------------------------------------------------
         return
 
+
+    def screen2_temperature(
+            self,
+            current_value,
+            logger
+        ):
+        """
+            Draws 24h temperature history as a barplot on the second
+            screen layout.
+
+            Arguments:
+            ----------
+                current_value: float
+                    Current temperature in Celsius
+                logger: Logger
+                    Logger instance to retrieve historical data for the temperature
+
+            Returns:
+            --------
+                None
+                   This function draws the screen and does not return any value.
+        """
+        self._screen2_template(
+                    current_value = current_value,
+                    logger = logger,
+                    unit = "°C",
+                    title = "24h Temperature History"
+                )
+    #-- Return --------------------------------------------------------
+        return
+
+    def _screen2_template(
+            self,
+            current_value,
+            logger,
+            unit = "",
+            title = ""
+        ):
+        """
+            Template function for the second screen layout with a barplot of
+            historical data.
+
+            Arguments:
+            ----------
+                current_value: float
+                    Current value to display
+                logger: Logger
+                    Logger instance to retrieve historical data for the barplot
+                unit: str
+                    Unit of the current value to display (e.g. "°C", "%", "ppm")
+                title: str
+                    Title to display above the barplot
+            
+            Returns:
+            --------
+                None
+                   This function draws the screen and does not return any value.
+        """
+    #-- Get frame buffer ----------------------------------------------
+        fb = self.screen_writer.fb #.......................... Get the frame buffer from the screen writer
+
+    #-- Set Font ------------------------------------------------------
+        self.screen_writer.change_font(OpenSansBold_20)  #.... Change the font back to the default for the next screen
+
+    #-- Clear frame buffer with white color ---------------------------
+        self.screen_writer.clear_fb(color=0xFF)
+
+    #-- Plot title ----------------------------------------------------
+        self.screen_writer.add_text(
+                text = title,
+                x = 10,
+                y = 5,
+                invert = True
+            )
+
+    #-- Plot barplot --------------------------------------------------
+        RECT_START_X  = 10 #....................... Start x coordinate of the barplot area
+        RECT_END_X    = 264 - 50 #................. End x coordinate of the barplot area
+        RECT_START_Y  = 30 #....................... Start y coordinate of the barplot area
+        RECT_HEIGHT   = 55 #....................... Height of the barplot area
+
+        if logger.count() > 0:
+        #-- Get the minimal and maximal value -------------------------
+            value_min = logger.min()
+            value_max = logger.max()
+        #-- Correct by the current value ------------------------------
+            if current_value < value_min:
+                value_min = current_value
+            if current_value > value_max:
+                value_max = current_value
+        #-- Set logical x/y ranges for the barplot --------------------
+            x_min = 0 #............................ Set x_min to 0 seconds ago (current time)
+            x_max = logger.max_bin_history_sec()#.. Set x_max to 24 hours in seconds
+            y_min = value_min - 2. #............... Set y_min to the minimum logged temperature minus some margin
+            y_max = value_max + 2. #............... Set y_max to the maximum logged temperature plus some margin
+
+            x_scr_min = RECT_START_X
+            y_scr_min = RECT_START_Y
+            x_scr_max = RECT_END_X
+            y_scr_max = RECT_START_Y + RECT_HEIGHT
+
+            samples = logger.bin_series() #........ Binned samples for the barplot
+
+            self.draw_barplot(
+                    x_scr_min,
+                    y_scr_min,
+                    x_scr_max,
+                    y_scr_max,
+                    x_min,
+                    y_min,
+                    x_max,
+                    y_max,
+                    samples,
+                    color=0x00
+                ) #................................ Draw the barplot
+            
+        #-- Plot y values on the right side of the barplot ------------
+            self.screen_writer.change_font(OpenSansBold_12)  #.... Change the font to small size
+            self.screen_writer.add_text(
+                text = f"{y_max:2.1f} {unit}",
+                x = int(RECT_END_X + 5),
+                y = int(RECT_START_Y),
+                invert = True
+            )
+            self.screen_writer.add_text(
+                text = f"{y_min:2.1f} {unit}",
+                x = int(RECT_END_X + 5),
+                y = int(RECT_START_Y + 0.90 * RECT_HEIGHT),
+                invert = True
+            )
+            self.screen_writer.change_font(OpenSansBold_20)  #.... Change the font back to the default for the next screen
+
+    #-- Draw box around the barplot -----------------------------------
+        fb.rect(
+            RECT_START_X,
+            RECT_START_Y,
+            RECT_END_X - RECT_START_X,
+            RECT_HEIGHT,
+            0x00,
+            False
+        ) #............................................. Draw first rectangle for temperature
+
+    #-- Draw ticks and labels for the barplot -------------------------
+        fb.vline(
+            int(RECT_START_X),
+            int(RECT_START_Y + RECT_HEIGHT - 0),
+            5,
+            0x00
+        ) #... Y-axis line
+
+        fb.vline(
+            int(RECT_START_X + 0.25 * (RECT_END_X - RECT_START_X)),
+            int(RECT_START_Y + RECT_HEIGHT - 0),
+            5,
+            0x00
+        ) #... Y-axis line
+
+        fb.vline(
+            int(RECT_START_X + 0.5 * (RECT_END_X - RECT_START_X)),
+            int(RECT_START_Y + RECT_HEIGHT - 0),
+            5,
+            0x00
+        ) #... Y-axis line
+
+        fb.vline(
+            int(RECT_START_X + 0.75 * (RECT_END_X - RECT_START_X)),
+            int(RECT_START_Y + RECT_HEIGHT - 0),
+            5,
+            0x00
+        ) #... Y-axis line
+
+        fb.vline(
+            int(RECT_END_X - 1),
+            int(RECT_START_Y + RECT_HEIGHT - 0),
+            5,
+            0x00
+        ) #... Y-axis line
+
+        self.screen_writer.change_font(OpenSansBold_12)  #.... Change the font to small size
+
+        self.screen_writer.add_text(
+                text = "24h",
+                x = int(RECT_START_X),
+                y = int(RECT_START_Y + RECT_HEIGHT + 5),
+                invert = True
+            )
+
+        self.screen_writer.add_text(
+                text = "18h",
+                x = int(RECT_START_X + 0.25 * (RECT_END_X - RECT_START_X)),
+                y = int(RECT_START_Y + RECT_HEIGHT + 5),
+                invert = True
+            )
+
+        self.screen_writer.add_text(
+                text = "12h",
+                x = int(RECT_START_X + 0.5 * (RECT_END_X - RECT_START_X)),
+                y = int(RECT_START_Y + RECT_HEIGHT + 5),
+                invert = True
+            )
+
+        self.screen_writer.add_text(
+                text = "6h",
+                x = int(RECT_START_X + 0.75 * (RECT_END_X - RECT_START_X)),
+                y = int(RECT_START_Y + RECT_HEIGHT + 5),
+                invert = True
+            )
+
+        self.screen_writer.add_text(
+                text = "Now",
+                x = int(RECT_START_X + 0.90 * (RECT_END_X - RECT_START_X)),
+                y = int(RECT_START_Y + RECT_HEIGHT + 5),
+                invert = True
+            )
+
+        self.screen_writer.change_font(OpenSansBold_20)  #.... Change the font back to the default for the next screen
+
+    #-- Add information -----------------------------------------------
+        self.screen_writer.add_text(
+                text = f"Current: {current_value:2.1f} {unit}",
+                x = 10,
+                y = 110,
+                invert = True
+            )
+        
+        if logger.count() > 0:
+        #-- Get the minimal and maximal value -------------------------
+            value_min = logger.min()
+            value_max = logger.max()
+        #-- Corect by the current value -------------------------------
+            if current_value < value_min:
+                value_min = current_value
+            if current_value > value_max:
+                value_max = current_value
+        #-- Plot text -------------------------------------------------
+            self.screen_writer.add_text(
+                    text = f"Min/Max: {value_min:2.1f} / {value_max:2.1f} {unit}",
+                    x = 10,
+                    y = 140,
+                    invert = True
+                )
+        else:
+            self.screen_writer.add_text(
+                    text = f"Min/Max: n/a {unit}",
+                    x = 10,
+                    y = 140,
+                    invert = True
+                )
+
+    #-- Return --------------------------------------------------------
+        return
+    
     def draw_barplot(
             self,
             x_scr_min, y_scr_min,

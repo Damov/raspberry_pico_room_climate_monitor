@@ -193,6 +193,9 @@ def main():
                     logger_humidity_shortterm,
                     logger_co2_shortterm
                 ) #.............................................. Draw the first screen layout with the latest sensor readings and loggers for short-term history
+        """
+
+        screen_manager.screen2_temperature(temp, logger_temperature_24h)
 
     #-- Update screen -----------------------------------------------------
         if first_refresh:
