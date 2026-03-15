@@ -240,16 +240,14 @@ def main():
             bme_addr = 0x77,
             freq=100000
         ) #............................................. Initialize BME280 sensor
+
     sensor_scd41 = SCD41(
-            i2c_bus_id=0,
-            scl_pin=1,
-            sda_pin=0,
+            i2c_bus_id=1,
+            scl_pin=3,
+            sda_pin=2,
             address=0x62,
             freq=100000
         ) #............................................. Initialize SCD41 sensor
-    
-#-- Referesh screen -------------------------------------------------------
-    screen_writer.show() #......................... First full refresh
     
     while True:
     #-- Garbage collection to free up memory ------------------------------
