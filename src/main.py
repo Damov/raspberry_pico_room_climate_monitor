@@ -277,24 +277,49 @@ def main():
         print_mem("after logger")
 
     #-- Draw the first screen layout with the example data ----------------
-        """
-        screen_manager.screen1(
-                    temp,
-                    hum,
-                    pressure,
-                    CO2,
-                    logger_temperature_shortterm,
-                    logger_humidity_shortterm,
-                    logger_co2_shortterm
-                ) #.............................................. Draw the first screen layout with the latest sensor readings and loggers for short-term history
-        """
-
-        screen_manager.screen2_temperature(temp, logger_temperature_24h)
+        gc.collect() #..................................................... Run garbage collection to free up memory before the next loop iteration
+        try:
+            print(f"Drawing screen layout {SCR_LAYOUT_NUMBER} ...")
+            if SCR_LAYOUT_NUMBER == 0:
+                screen_manager.screen1(
+                            temp,
+                            hum,
+                            pressure,
+                            CO2,
+                            logger_temperature_shortterm,
+                            logger_humidity_shortterm,
+                            logger_co2_shortterm
+                    ) #.............................................. Draw the first screen layout with the latest sensor readings and loggers for short-term history
+            elif SCR_LAYOUT_NUMBER == 1:
+                screen_manager.screen2_24h_temperature_history(
+                                temp,
+                                logger_temperature_24h
+                            )
+            elif SCR_LAYOUT_NUMBER == 2:
+                screen_manager.screen3_24h_humidity_history(
+                                    hum,
+                                    logger_humidity_24h
+                            )
+            elif SCR_LAYOUT_NUMBER == 3:
+                screen_manager.screen4_24h_co2_history(
+                                    CO2,
+                                    logger_co2_24h
+                            )
+            elif SCR_LAYOUT_NUMBER == 4:
+                screen_manager.screen5_24h_pressure_history(
+                                    pressure,
+                                    logger_pressure_24h
+                            )
+            else:
+                raise ValueError(f"Invalid screen mode: {screen_mode}") #........ Raise an error if the screen mode is invalid (not 0 or 1)
+        except MemoryError as e:
+            print(f"MemoryError: {e}")
 
     #-- Update screen -----------------------------------------------------
-        if first_refresh:
+        if first_refresh or SCR_FULL_REFRESH:
             screen_writer.show() #......................... First full refresh
             first_refresh = False
+            SCR_FULL_REFRESH = False
         else:
             FULL_INTERVAL_MS    = 15 * 60 * 1000   # 15 min
             FAST_INTERVAL_MS    = 5  * 60 * 1000   # 5 min

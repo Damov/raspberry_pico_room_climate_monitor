@@ -61,17 +61,19 @@ class ScreenManager:
         self.screen_writer.clear_fb(color=0x00)
 
     #-- Load screen 1 background --------------------------------------
-        img_width, img_height = 264, 176  # set to image size
-        
-        with open("img/static_screen1_background.bin", "rb") as f:
-            img_buf = bytearray(f.read())
-        
+        fname = "img/static_screen1_background.bin"
+        img_width  = 264
+        img_height = 176
+
         self.screen_writer.add_image(
-                img_buf,
-                img_width,
-                img_height,
-                x=0,
-                y=0
+                            fname,
+                            img_width,
+                            img_height,
+                            x=0,
+                            y=0,
+                            do_gc = True,
+                            invert_colors = False,
+                            show_after = False
             )
     
     #-- Add temperature -----------------------------------------------
@@ -205,7 +207,7 @@ class ScreenManager:
         return
 
 
-    def screen2_temperature(
+    def screen2_24h_temperature_history(
             self,
             current_value,
             logger
@@ -231,6 +233,96 @@ class ScreenManager:
                     logger = logger,
                     unit = "°C",
                     title = "24h Temperature History"
+                )
+    #-- Return --------------------------------------------------------
+        return
+
+    def screen3_24h_humidity_history(
+            self,
+            current_value,
+            logger
+        ):
+        """
+            Draws 24h humidity history as a barplot on the third
+            screen layout.
+
+            Arguments:
+            ----------
+                current_value: float
+                    Current humidity in percentage
+                logger: Logger
+                    Logger instance to retrieve historical data for the humidity
+
+            Returns:
+            --------
+                None
+                   This function draws the screen and does not return any value.
+        """
+        self._screen2_template(
+                    current_value = current_value,
+                    logger = logger,
+                    unit = "%",
+                    title = "24h Humidity History"
+                )
+    #-- Return --------------------------------------------------------
+        return
+
+    def screen4_24h_co2_history(
+            self,
+            current_value,
+            logger
+        ):
+        """
+            Draws 24h CO2 history as a barplot on the fourth
+            screen layout.
+
+            Arguments:
+            ----------
+                current_value: float
+                    Current CO2 concentration in ppm
+                logger: Logger
+                    Logger instance to retrieve historical data for the CO2
+
+            Returns:
+            --------
+                None
+                   This function draws the screen and does not return any value.
+        """
+        self._screen2_template(
+                    current_value = current_value,
+                    logger = logger,
+                    unit = "ppm",
+                    title = "24h CO2 History"
+                )
+    #-- Return --------------------------------------------------------
+        return
+
+    def screen5_24h_pressure_history(
+            self,
+            current_value,
+            logger
+        ):
+        """
+            Draws 24h pressure history as a barplot on the fifth
+            screen layout.
+
+            Arguments:
+            ----------
+                current_value: float
+                    Current pressure in hPa
+                logger: Logger
+                    Logger instance to retrieve historical data for the pressure
+
+            Returns:
+            --------
+                None
+                   This function draws the screen and does not return any value.
+        """
+        self._screen2_template(
+                    current_value = current_value,
+                    logger = logger,
+                    unit = "hPa",
+                    title = "24h Pressure History"
                 )
     #-- Return --------------------------------------------------------
         return
@@ -323,13 +415,13 @@ class ScreenManager:
         #-- Plot y values on the right side of the barplot ------------
             self.screen_writer.change_font(OpenSansBold_12)  #.... Change the font to small size
             self.screen_writer.add_text(
-                text = f"{y_max:2.1f} {unit}",
+                text = f"{y_max:2.1f}",
                 x = int(RECT_END_X + 5),
                 y = int(RECT_START_Y),
                 invert = True
             )
             self.screen_writer.add_text(
-                text = f"{y_min:2.1f} {unit}",
+                text = f"{y_min:2.1f}",
                 x = int(RECT_END_X + 5),
                 y = int(RECT_START_Y + 0.90 * RECT_HEIGHT),
                 invert = True
