@@ -1,4 +1,5 @@
 import machine
+from machine import Pin
 from utime import sleep, time, ticks_ms, ticks_diff
 import gc
 
@@ -10,7 +11,7 @@ from logger import Logger
 from drivers.SCD41_driver import SCD41
 from drivers.BME280_driver import BME280
 
-from fonts import OpenSansBold_28
+from fonts import OpenSansBold_28, OpenSansBold_20
 
 def print_mem(label=""):
     """
@@ -69,6 +70,73 @@ def main():
         Main function to initialize sensors, logger, and screen,
         and to continuously read sensor data, log it, and update the screen.
     """
+#-- Variables required to control the device with buttons -------------
+    SCR_LAYOUT_NUMBER = 0 #.............................. Screen layout number (0, 1, 2, ...) to control which screen layout is currently displayed
+    SCR_MAX_LAYOUT_NUMBER = 4 #.......................... Maximum screen layout number (assuming we have 5 layouts: 0, 1, 2, 3, 4)
+    SCR_FULL_REFRESH = False #........................... Flag to indicate if a full screen refresh is requested by button press
+    BTN_PRESSED_FLAG = False #........................... Flag to indicate if a button has been pressed to request an immediate screen update
+
+#-- Define K1, K2, K3, K4 pins for future use -------------------------
+    btn_K1 = machine.Pin(21, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K1 pin as input with pull-up resistor on GP21
+    btn_K2 = machine.Pin(20, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K2 pin as input with pull-up resistor on GP20
+    btn_K3 = machine.Pin(19, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K3 pin as input with pull-up resistor on GP19
+    btn_K4 = machine.Pin(18, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K4 pin as input with pull-up resistor on GP18
+
+#-- Define callback functions for button presses ----------------------
+    def isr_btn_k1(pin):
+        print("K1 button pressed, going to home screen...")
+        nonlocal BTN_PRESSED_FLAG, \
+            SCR_LAYOUT_NUMBER, \
+            SCR_FULL_REFRESH #................................. Declare nonlocal variables
+        SCR_LAYOUT_NUMBER = 0 #................................ Set screen layout number to 0 (home screen)
+        SCR_FULL_REFRESH = True #.............................. Flag to indicate if a full screen refresh is requested by button press
+        BTN_PRESSED_FLAG = True #.............................. Flag to indicate that a button has been pressed to request an immediate screen update
+        sleep(0.2) #........................................... Sleep for a short time to debounce the button press and avoid multiple triggers
+        return
+
+    def isr_btn_k2(pin):
+        print("K2 button pressed, going to previous screen...")
+        nonlocal BTN_PRESSED_FLAG, \
+            SCR_LAYOUT_NUMBER, \
+            SCR_FULL_REFRESH, \
+            SCR_MAX_LAYOUT_NUMBER #............................ Declare nonlocal variables
+        SCR_LAYOUT_NUMBER -= 1 #............................... Decrease screen layout number to go to the previous screen
+        if SCR_LAYOUT_NUMBER < 0:
+            SCR_LAYOUT_NUMBER = SCR_MAX_LAYOUT_NUMBER #........ Ensure screen layout number does not go below 0
+        SCR_FULL_REFRESH = True #.............................. Flag to indicate if a full screen refresh is requested by button press
+        BTN_PRESSED_FLAG = True #.............................. Flag to indicate that a button has been pressed to request an immediate screen update
+        sleep(0.2) #........................................... Sleep for a short time to debounce the button press and avoid multiple triggers
+        return
+
+    def isr_btn_k3(pin):
+        print("K3 button pressed, going to next screen...")
+        nonlocal BTN_PRESSED_FLAG, \
+            SCR_LAYOUT_NUMBER, \
+            SCR_FULL_REFRESH, \
+            SCR_MAX_LAYOUT_NUMBER #............................ Declare nonlocal variables
+        SCR_LAYOUT_NUMBER += 1 #............................... Increase screen layout number to go to the next screen
+        if SCR_LAYOUT_NUMBER > SCR_MAX_LAYOUT_NUMBER:
+            SCR_LAYOUT_NUMBER = 0 #............................ Ensure screen layout number does not exceed maximum
+        SCR_FULL_REFRESH = True #.............................. Flag to indicate if a full screen refresh is requested by button press
+        BTN_PRESSED_FLAG = True #.............................. Flag to indicate that a button has been pressed to request an immediate screen update
+        sleep(0.2) #........................................... Sleep for a short time to debounce the button press and avoid multiple triggers
+        return
+
+    def isr_btn_k4(pin):
+        print("K4 button pressed, refreshing screen...")
+        nonlocal BTN_PRESSED_FLAG, \
+            SCR_FULL_REFRESH #................................. Declare nonlocal variables
+        SCR_FULL_REFRESH = True #.............................. Flag to indicate if a full screen refresh is requested by button press
+        BTN_PRESSED_FLAG = True #.............................. Flag to indicate that a button has been pressed to request an immediate screen update
+        sleep(0.2) #........................................... Sleep for a short time to debounce the button press and avoid multiple triggers
+        return
+    
+#-- Attach interrupt handlers for button presses ----------------------
+    btn_K1.irq(trigger=Pin.IRQ_FALLING, handler=isr_btn_k1) #........ Attach interrupt handler for K1 button press (falling edge)
+    btn_K2.irq(trigger=Pin.IRQ_FALLING, handler=isr_btn_k2) #........ Attach interrupt handler for K2 button press (falling edge)
+    btn_K3.irq(trigger=Pin.IRQ_FALLING, handler=isr_btn_k3) #........ Attach interrupt handler for K3 button press (falling edge)
+    btn_K4.irq(trigger=Pin.IRQ_FALLING, handler=isr_btn_k4) #........ Attach interrupt handler for K4 button press (falling edge)
+
 #-- Set time refresh intervals to current time ------------------------
     last_full = ticks_ms()
     last_fast = ticks_ms()
@@ -101,7 +169,7 @@ def main():
 
 #-- Initialize the 24h-term Logger ----------------------------------
     MAX_BIN_HISTORY = 24 * 3600 #................. Keep 24 hours of history in seconds
-    BIN_TIMESPAN    = 15 * 60 #................... Bin width of 15 minutes for output in seconds
+    BIN_TIMESPAN    = 30 * 60 #................... Bin width of 30 minutes for output in seconds
 
     logger_pressure_24h = Logger(
             max_bin_history = MAX_BIN_HISTORY, #.. Keep 24 hours of history
@@ -132,6 +200,34 @@ def main():
             font = OpenSansBold_28,
             verbose = True
         )
+    
+#-- Refresh screen --------------------------------------------------------
+    screen_writer.show() #......................... First full refresh
+
+#-- Show splash screen ------------------------------------------------
+    fname = "img/splash_screen.bin"
+    img_width  = 264
+    img_height = 176
+
+    screen_writer.add_image(
+        fname,
+        img_width,
+        img_height,
+        x=0,
+        y=0,
+        do_gc = True,
+        show_after = False
+    ) #............................. Add splash screen image to the screen
+
+    screen_writer.change_font(OpenSansBold_20)
+    screen_writer.add_text(
+            "Loading...",
+            85,
+            155,
+            invert=False
+        ) #......................... Add "Loading..." text to the screen
+    screen_writer.change_font(OpenSansBold_28)
+    screen_writer.show() #.......... Show the splash screen with the loading message
 
 #-- Create a ScreenManager instance -----------------------------------
     screen_manager = ScreenManager(screen_writer)
@@ -144,16 +240,14 @@ def main():
             bme_addr = 0x77,
             freq=100000
         ) #............................................. Initialize BME280 sensor
+
     sensor_scd41 = SCD41(
-            i2c_bus_id=0,
-            scl_pin=1,
-            sda_pin=0,
+            i2c_bus_id=1,
+            scl_pin=3,
+            sda_pin=2,
             address=0x62,
             freq=100000
         ) #............................................. Initialize SCD41 sensor
-    
-#-- Referesh screen -------------------------------------------------------
-    screen_writer.show() #......................... First full refresh
     
     while True:
     #-- Garbage collection to free up memory ------------------------------
@@ -183,24 +277,49 @@ def main():
         print_mem("after logger")
 
     #-- Draw the first screen layout with the example data ----------------
-        """
-        screen_manager.screen1(
-                    temp,
-                    hum,
-                    pressure,
-                    CO2,
-                    logger_temperature_shortterm,
-                    logger_humidity_shortterm,
-                    logger_co2_shortterm
-                ) #.............................................. Draw the first screen layout with the latest sensor readings and loggers for short-term history
-        """
-
-        screen_manager.screen2_temperature(temp, logger_temperature_24h)
+        gc.collect() #..................................................... Run garbage collection to free up memory before the next loop iteration
+        try:
+            print(f"Drawing screen layout {SCR_LAYOUT_NUMBER} ...")
+            if SCR_LAYOUT_NUMBER == 0:
+                screen_manager.screen1(
+                            temp,
+                            hum,
+                            pressure,
+                            CO2,
+                            logger_temperature_shortterm,
+                            logger_humidity_shortterm,
+                            logger_co2_shortterm
+                    ) #.............................................. Draw the first screen layout with the latest sensor readings and loggers for short-term history
+            elif SCR_LAYOUT_NUMBER == 1:
+                screen_manager.screen2_24h_temperature_history(
+                                temp,
+                                logger_temperature_24h
+                            )
+            elif SCR_LAYOUT_NUMBER == 2:
+                screen_manager.screen3_24h_humidity_history(
+                                    hum,
+                                    logger_humidity_24h
+                            )
+            elif SCR_LAYOUT_NUMBER == 3:
+                screen_manager.screen4_24h_co2_history(
+                                    CO2,
+                                    logger_co2_24h
+                            )
+            elif SCR_LAYOUT_NUMBER == 4:
+                screen_manager.screen5_24h_pressure_history(
+                                    pressure,
+                                    logger_pressure_24h
+                            )
+            else:
+                raise ValueError(f"Invalid screen mode: {screen_mode}") #........ Raise an error if the screen mode is invalid (not 0 or 1)
+        except MemoryError as e:
+            print(f"MemoryError: {e}")
 
     #-- Update screen -----------------------------------------------------
-        if first_refresh:
+        if first_refresh or SCR_FULL_REFRESH:
             screen_writer.show() #......................... First full refresh
             first_refresh = False
+            SCR_FULL_REFRESH = False
         else:
             FULL_INTERVAL_MS    = 15 * 60 * 1000   # 15 min
             FAST_INTERVAL_MS    = 5  * 60 * 1000   # 5 min
@@ -225,8 +344,18 @@ def main():
 
         print_mem("after screen")
 
-    #-- Wait before the next update ---------------------------------------
-        sleep(5)
+    #-- Wait before the next update and check buttons ---------------------
+        WAIT_INTERVAL_MS = 30 * 1000 #.......................... Wait 30 seconds before the next loop iteration
+        start_wait       = ticks_ms() #......................... Current time in ms
+
+        while ticks_diff(ticks_ms(), start_wait) < WAIT_INTERVAL_MS:
+            if BTN_PRESSED_FLAG is True:
+                print("Button press detected, updating screen immediately...")
+                BTN_PRESSED_FLAG = False #....................... Reset the button pressed flag
+                break #.......................................... Exit the waiting loop to update the screen immediately
+            sleep(0.1) #......................................... Sleep for a short time to avoid busy-waiting and reduce CPU usage while waiting for the next update or button press
+
+    #-- Print a separator for the next loop iteration ---------------------
         print("Updating screen with new sensor readings...")
         print("-" * 50)
 

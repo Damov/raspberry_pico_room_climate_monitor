@@ -295,15 +295,25 @@ class ScreenWriter:
     # |                   HIGH-LEVEL IMAGE FUNCTIONS                        |
     # + =================================================================== +
 
-    def add_image(self, img_buf, img_w, img_h, x=0, y=0):
+    def add_image(
+              self,
+              fname,
+              img_w,
+              img_h,
+              x = 0,
+              y = 0,
+              do_gc = True,
+              show_after = True,
+              invert_colors = True
+            ):
         """
         Add an image to the framebuffer. The image is provided as a bytearray
         (img_buf) with the specified width (img_w) and height (img_h).
 
         Arguments:
         ----------
-        img_buf: bytearray
-          The image data as a bytearray, where each byte represents a pixel color.
+        fname: str
+          The path to the image file to be added.
         img_w: int
           The width of the image in pixels.
         img_h: int
@@ -314,177 +324,58 @@ class ScreenWriter:
         y: int
           The y-coordinate (row) for the top-left corner of the image on the
           framebuffer (default: 0).
+        do_gc: bool
+          If True, perform garbage collection after drawing the image to free up
+          memory (default: True).
+        show_after: bool
+          If True, call self.show() to update the display after drawing the image
+          (default: True).
+        invert_colors: bool
+          If True, invert the colors of the image when drawing (default: True).
 
         Returns:
         --------
         None
         """
-    #-- Loop through each pixel in the image buffer and draw it on the framebuffer -
-        for yy in range(img_h):
-            dy = y + yy
-            if dy < 0 or dy >= self.height:
-                continue
-            row_off = yy * img_w
-            for xx in range(img_w):
-                dx = x + xx
-                if dx < 0 or dx >= self.width:
-                    continue
-                c = img_buf[row_off + xx]
-                self.fb.pixel(dx, dy, c)
+
+    #-- Garbage collection to free up memory after drawing the image -----------
+        if do_gc:
+            import gc
+            gc.collect()
+
+    #-- Read the image file in chunks and draw it on the framebuffer to avoid
+    #   loading the entire image into memory at once ---------------------------
+        row_bytes = img_w #..................................... 1 byte per pixel
+        line_buf = bytearray(row_bytes) #....................... Buffer for one row of pixel data
+
+        with open(fname, "rb") as f:
+            for yy in range(img_h):
+                dy = y + yy
+                n = f.readinto(line_buf)
+                if n != row_bytes:
+                    break #...................................... Truncated
+                
+                if dy < 0 or dy >= self.height:
+                    continue #................................... Skip rows outside the framebuffer bounds
+                
+                for xx in range(img_w):
+                    dx = x + xx
+                    if dx < 0 or dx >= self.width:
+                        continue #............................... Skip pixels outside the framebuffer bounds
+
+                #-- Map the pixel value from the image buffer to the framebuffer
+                #   color ------------------------------------------------------
+                    v = line_buf[xx] #........................... Get pixel value from image buffer (0-255)
+                    if invert_colors:
+                        c = 0 if v > 127 else 1 #................ Invert color: 1 for dark pixels, 0 for light pixels
+                    else:
+                        c = 1 if v > 127 else 0 #................ No inversion: 1 for light pixels, 0 for dark pixels
+                    self.fb.pixel(dx, dy, c) #................... Draw pixel on framebuffer
+    #-- Show the updated framebuffer on the display if requested ---------------
+        if show_after:
+            self.show()
+
     #-- Return -----------------------------------------------------------------
-        return
-
-    def add_image_center(
-                    self,
-                    img_buf,
-                    img_w,
-                    img_h,
-                    x_start=0,
-                    x_end=None,
-                    y_start=0,
-                    y_end=None
-                ):
-        """
-            Draw an image centered horizontally and vertically within a
-            defined rectangle.
-
-            Arguments:
-            ----------
-            img_buf: bytearray
-              The image data as a bytearray, where each byte represents
-              a pixel color.
-            img_w: int
-              The width of the image in pixels.
-            img_h: int
-              The height of the image in pixels.
-            x_start: int
-              The starting x-coordinate of the rectangle (default: 0).
-            x_end: int or None
-              The ending x-coordinate of the rectangle (default: None,
-              which means the width of the screen).
-            y_start: int
-              The starting y-coordinate of the rectangle (default: 0).
-            y_end: int or None
-              The ending y-coordinate of the rectangle (default: None,
-              which means the height of the screen).
-
-            Returns:
-            --------
-            None
-        """
-    #-- Set default values for x_end and y_end if they are None -----------------
-        if x_end is None:
-            x_end = self.width
-        if y_end is None:
-            y_end = self.height
-
-    #-- Calculate the position to center the image within the defined rectangle -
-        area_w = x_end - x_start
-        area_h = y_end - y_start
-
-        x = x_start + (area_w - img_w) // 2
-        y = y_start + (area_h - img_h) // 2
-
-    #-- Add the image at the calculated position --------------------------------
-        self.add_image(img_buf, img_w, img_h, x, y)
-
-    #-- Return ------------------------------------------------------------------
-        return
-
-    def add_image_horizontal_center(
-                            self,
-                            img_buf,
-                            img_w,
-                            img_h,
-                            y,
-                            x_start=0,
-                            x_end=None
-                        ):
-        """
-            Draw an image centered horizontally within a defined
-            horizontal area, with a fixed y-coordinate.
-
-            Arguments:
-            ----------
-            img_buf: bytearray
-              The image data as a bytearray, where each byte represents
-              a pixel color.
-            img_w: int
-              The width of the image in pixels.
-            img_h: int
-              The height of the image in pixels.
-            y: int
-              The y-coordinate (row) for the top-left corner of the image.
-            x_start: int
-              The starting x-coordinate of the horizontal area (default: 0).
-            x_end: int or None
-              The ending x-coordinate of the horizontal area (default: None,
-              which means the width of the screen).
-
-            Returns:
-            --------
-            None
-        """
-    #-- Set default value for x_end if it is None ---------------------------
-        if x_end is None:
-            x_end = self.width
-    
-    #-- Calculate the x position to center the image horizontally -----------
-        area_w = x_end - x_start
-        x = x_start + (area_w - img_w) // 2
-
-    #-- Add the image at the calculated position ----------------------------
-        self.add_image(img_buf, img_w, img_h, x, y)
-
-    #-- Return --------------------------------------------------------------
-        return
-
-    def add_image_vertical_center(
-                            self,
-                            img_buf,
-                            img_w,
-                            img_h,
-                            x,
-                            y_start=0,
-                            y_end=None
-                        ):
-        """
-            Draw an image centered vertically within a defined vertical area,
-            with a fixed x-coordinate.
-
-            Arguments:
-            ----------
-            img_buf: bytearray
-              The image data as a bytearray, where each byte represents
-              a pixel color.
-            img_w: int
-              The width of the image in pixels.
-            img_h: int
-              The height of the image in pixels.
-            x: int
-              The x-coordinate (column) for the top-left corner of the image.
-            y_start: int
-              The starting y-coordinate of the vertical area (default: 0).
-            y_end: int or None
-              The ending y-coordinate of the vertical area (default: None,
-              which means the height of the screen).
-
-            Returns:
-            --------
-            None
-        """
-    #-- Set default value for y_end if it is None ---------------------------
-        if y_end is None:
-            y_end = self.height
-
-    #-- Calculate the y position to center the image vertically -------------
-        area_h = y_end - y_start
-        y = y_start + (area_h - img_h) // 2
-
-    #-- Add the image at the calculated position ----------------------------
-        self.add_image(img_buf, img_w, img_h, x, y)
-
-    #-- Return --------------------------------------------------------------
         return
     
     # + =================================================================== +
