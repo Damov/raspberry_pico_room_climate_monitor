@@ -52,14 +52,19 @@ This section describes assembling the hardware and installing the firmware for t
 
 ## Assembly
 
-In this section, the assembly of the system is described. As mentioned in the introduction, the system integrates a <b>Raspberry Pi Pico microcontroller</b>, a <b>Waveshare 2.7‑inch E‑Paper display module</b> (264 × 176 pixels), a <b>Waveshare BME280</b> environmental sensor, and a <b>Hailege SCD41 CO₂</b> gas sensor. 
+In this section, the assembly of the system is described. As mentioned in the introduction, the system integrates a <b>Raspberry Pi Pico microcontroller</b>, a <b>Waveshare 2.7‑inch E‑Paper display module</b> (264 × 176 pixels), a <b>Waveshare BME280</b> environmental sensor, and a <b>Hailege SCD41 CO₂</b> gas sensor.
 
-Both sensors are connected to I2C bus 0, with the clock line (<b>SCL</b>) on <b>GP1</b> and the data line (<b>SDA</b>) on <b>GP0</b> of the Raspberry Pi Pico:
+The <b>BME280</b> sensor is connected to I2C bus 0, with the clock line (<b>SCL</b>) on <b>GP1</b> and the data line (<b>SDA</b>) on <b>GP0</b> of the Raspberry Pi Pico:
 
-* SCL → GP1
 * SDA → GP0
+* SCL → GP1
 
-Both devices can share the same general‑purpose pins because they use different I2C addresses (BME280: <b>0x77</b>, SCD41: <b>0x62</b>). The sensors can be powered from either 3.3 V or 5 V, so they may be connected to <b>3V3(OUT)</b>, <b>VSYS</b>, or <b>VBUS</b> on the Pico depending on your power‑supply configuration. So, three power pins can be used at the same time.
+The <b>SCD51</b> sensor is connected to I2C bus 1, with the clock line (<b>SCL</b>) on <b>GP3</b> and the data line (<b>SDA</b>) on <b>GP2</b> of the Raspberry Pi Pico:
+
+* SDA → GP2
+* SCL → GP3
+
+In this project, both sensors are using different I2C busses. However, both devices could also share the same I2C bus because they use different I2C addresses (BME280: <b>0x77</b>, SCD41: <b>0x62</b>). The sensors can be powered from either 3.3 V or 5 V, so they may be connected to <b>3V3(OUT)</b>, <b>VSYS</b>, or <b>VBUS</b> on the Pico depending on your power‑supply configuration. So, three different power pins can be used at the same time.
 
 <p align="center">
   <img src="images/circuit_image.png" width="600" alt="Circuit layout">
@@ -73,6 +78,13 @@ The display is wired using a JST‑to‑Dupont cable (<b>PH2.0, 20 cm, 8‑pin
 * DC → GP8
 * RST → GP12
 * BUSY → GP13
+
+To control the screen, four buttons (K1, K2, K3, K4) are used. Currently, five screen layouts are defined. The K1 button returns to screen 0 (the home screen), K2 switches to the previous screen layout, K3 advances to the next layout, and K4 refreshes the current view, as e‑Paper displays can sometimes show visual artifacts. The buttons share a common ground connection on the <b>Raspberry Pi Pico microcontroller</b>, with the <b>GP21</b> pin assigned to <b>K1</b>, <b>GP20</b> to <b>K2</b>, <b>GP19</b> to <b>K3</b>, and <b>GP18</b> to <b>K4</b> button:
+
+* GND → K1 → GP21
+* GND → K2 → GP20
+* GND → K3 → GP19
+* GND → K4 → GP18
 
 ## Firmware installation
 
