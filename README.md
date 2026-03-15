@@ -117,21 +117,18 @@ Open the Thonny editor and select the Pico’s Python interpreter (it will appea
 
 <b>Note:</b> During boot, the MicroPython runtime on the board will look for the file <b>main.py</b> and execute it automatically. You can also run it manually from the Thonny editor. Simply double‑click <b>main.py</b> in the board’s file system. A new window will open showing the code with the title <b>[main.py]</b>. It’s important that the filename appears inside square brackets - this indicates that you’ve opened the file from the board’s storage, not from your computer. When you click the green <b>“Run”</b> button in Thonny, the code will execute directly on the board.
 
+# Error indication and debugging
+
+When an error occurs, the on-board LED of the Raspberry Pi Pico microcontroller will start blinking. Additionally, a file named <i>exception.log</i> will be created in the root directory of the Pico’s file system, containing the exception details and full traceback.
+
 # Todo
-
-* ~~Let the onboard LED blink if there was somewhere an Exception raised and in main() not handeled (to indicated that the device crashed entirely)~~
-* ~~Write an unhandeled exception to the permanent storage of the raspberry pi pico as text file~~
-* Put the code, which updates the screen in try...except block and prevent out of memory exception
-* ~~Redesign the logger class more memory efficient (right now this class is too heavy for PICO's RAM)~~
-* ~~Define a long‑term logger for at least 24 h of data~~ and create a dedicated screen to plot the history (not all screens are defined yet).
+* Add five small circles on the right side of the screen to indicate which screen layout is currently shown 
+* Display any unhandled exception directly on the screen, or alternatively, show a dedicated crash screen indicating that the system has failed.
 * Define all configuration parameters in a config.ini file and load them at runtime.
-
-* Implement button handling to switch between multiple screen layouts.
 * Add a barometer function and a simple weather forecast based on pressure trends over the last 3 hours.
 * Design a 3D‑printable enclosure and publish the 3D model (e.g. as a download link).
 * Optional: Improve calibration of the sensor readings.
 * Optional: Add a buzzer for acoustic alerts.
-* Optional: Integrate a Waveshare UPS module for Raspberry Pi Pico with I²C status monitoring.
 
 # Known issues
 
