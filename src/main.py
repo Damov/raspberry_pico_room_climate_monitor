@@ -169,7 +169,7 @@ def main():
 
 #-- Initialize the 24h-term Logger ----------------------------------
     MAX_BIN_HISTORY = 24 * 3600 #................. Keep 24 hours of history in seconds
-    BIN_TIMESPAN    = 15 * 60 #................... Bin width of 15 minutes for output in seconds
+    BIN_TIMESPAN    = 30 * 60 #................... Bin width of 30 minutes for output in seconds
 
     logger_pressure_24h = Logger(
             max_bin_history = MAX_BIN_HISTORY, #.. Keep 24 hours of history
