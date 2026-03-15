@@ -10,7 +10,7 @@ from logger import Logger
 from drivers.SCD41_driver import SCD41
 from drivers.BME280_driver import BME280
 
-from fonts import OpenSansBold_28
+from fonts import OpenSansBold_28, OpenSansBold_20
 
 def print_mem(label=""):
     """
@@ -132,6 +132,34 @@ def main():
             font = OpenSansBold_28,
             verbose = True
         )
+    
+#-- Refresh screen --------------------------------------------------------
+    screen_writer.show() #......................... First full refresh
+
+#-- Show splash screen ------------------------------------------------
+    fname = "img/splash_screen.bin"
+    img_width  = 264
+    img_height = 176
+
+    screen_writer.add_image(
+        fname,
+        img_width,
+        img_height,
+        x=0,
+        y=0,
+        do_gc = True,
+        show_after = False
+    ) #............................. Add splash screen image to the screen
+
+    screen_writer.change_font(OpenSansBold_20)
+    screen_writer.add_text(
+            "Loading...",
+            85,
+            155,
+            invert=False
+        ) #......................... Add "Loading..." text to the screen
+    screen_writer.change_font(OpenSansBold_28)
+    screen_writer.show() #.......... Show the splash screen with the loading message
 
 #-- Create a ScreenManager instance -----------------------------------
     screen_manager = ScreenManager(screen_writer)
