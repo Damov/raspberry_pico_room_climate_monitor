@@ -7,9 +7,9 @@ A compact system based on the Raspberry Pi Pico designed for monitoring indoor c
 The following images illustrate the assembly of the system on a breadboard using jumper wires for all signal and power connections. The display is configured with a standard layout, presenting 15 minutes of historical data on the left side and three primary metrics on the right side: temperature, humidity, and CO₂ concentration. The on-screen buttons are currently not utilized; however, they are reserved for future functionality to allow switching between different display layouts.
 
 <p align="center">
-  <img src="images/assembly_01.jpeg" height="400" alt="Assembly of the system, picture 1">
-  <img src="images/assembly_02.jpeg" height="400" alt="Assembly of the system, picture 2">
-  <img src="images/assembly_03.png" height="400" alt="Assembly of the system, picture 3">
+  <img src="images/assembly_01.jpeg" width="400" alt="Assembly of the system, picture 1">
+  <img src="images/assembly_02.jpeg" width="400" alt="Assembly of the system, picture 2">
+  <img src="images/assembly_03.png" width="400" alt="Assembly of the system, picture 3">
 </p>
 
 # Features
