@@ -131,7 +131,8 @@ When an error occurs, the on-board LED of the Raspberry Pi Pico microcontroller 
 * Display any unhandled exception directly on the screen, or alternatively, show a dedicated crash screen indicating that the system has failed.
 * Define all configuration parameters in a config.ini file and load them at runtime.
 * Add a barometer function and a simple weather forecast based on pressure trends over the last 3 hours.
-* Design a 3D‑printable enclosure and publish the 3D model (e.g. as a download link).
+* ~~Design a 3D‑printable enclosure and publish the 3D model (e.g. as a download link).~~
+* Write a practical tutorial and tips how to assemble the case. 
 * Optional: Improve calibration of the sensor readings.
 * Optional: Add a buzzer for acoustic alerts.
 
