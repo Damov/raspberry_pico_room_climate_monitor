@@ -51,6 +51,10 @@ The <a href="src/drivers/screen_waveshare_2p7inch_module.py"><b>screen_waveshare
 
 This section describes assembling the hardware and installing the firmware for this system.
 
+## Case geometry
+
+The case geometry can be found in the <b>geometry</b> subfolder. This folder contains for the particular version the <b>STEP files</b> and the </b>3MF file</b>, which is suitable for 3D printing. The versioning of the case geometry does not necessarily correspond to the main firmware version number. Future versions of the case will be stored in this subfolder and labeled with their respective version numbers. The <b>3MF file</b> is typically optimized for the <b>Bambu Lab P1S</b> printer and may require adjustments for other printer models.
+
 ## Assembly
 
 In this section, the assembly of the system is described. As mentioned in the introduction, the system integrates a <b>Raspberry Pi Pico microcontroller</b>, a <b>Waveshare 2.7‑inch E‑Paper display module</b> (264 × 176 pixels), a <b>Waveshare BME280</b> environmental sensor, and a <b>Hailege SCD41 CO₂</b> gas sensor.
