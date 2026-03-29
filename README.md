@@ -30,9 +30,7 @@ The firmware will be extended in future with further functionalities.
 
 # Remarks
 
-## BME280 sensor
-
-This project utilises the Waveshare BME280 environmental sensor and the Hailege SCD41 CO₂ gas sensor breakout boards. During testing, the temperature and humidity readings from the BME280 were noticeably less accurate than those from the SCD41 when compared against an existing reference weather sensor in the room. The BME280 is retained in this design primarily to provide atmospheric pressure data and to enable a barometric function (planned for future implementation). If your application does not require barometric pressure, you can omit the BME280 and replace the pressure value in main.py with a fixed or dummy value.
+## Software architecture
 
 The <a href="src/main.py"><b>main.py</b></a> file acts as the central module, handling sensor data acquisition and triggering screen updates. In contrast, the display layouts are defined in <a href="src/screen_manager.py"><b>screen_manager.py</b></a>, where you can configure and customize the screen layouts according to your requirements.
 

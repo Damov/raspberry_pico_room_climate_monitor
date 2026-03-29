@@ -200,8 +200,13 @@ def main():
     #-- Get data frm sensors ----------------------------------------------
         print_mem("before loop step")
 
+        """
         CO2, temp, hum = sensor_scd41.read_measurement()
         _, pressure, _ = sensor_bme280.read_compensated()
+        """
+
+        CO2, _, _ = sensor_scd41.read_measurement()
+        temp, pressure, hum = sensor_bme280.read_compensated()
 
         print_mem("after sensors")
 
