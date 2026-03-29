@@ -293,7 +293,7 @@ def main():
         start_wait       = ticks_ms() #......................... Current time in ms
 
         while ticks_diff(ticks_ms(), start_wait) < WAIT_INTERVAL_MS:
-            DELAY_DEBOUNCE_MS = 0.05 #......................... Debounce delay to avoid multiple triggers from a single button press
+            DELAY_DEBOUNCE_MS = 0.20 #......................... Debounce delay to avoid multiple triggers from a single button press
 
             if btn_K1.value() == 0: #.......................... Check if K1 button is pressed (active low)
                 print(
