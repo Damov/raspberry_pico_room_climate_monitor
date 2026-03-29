@@ -71,71 +71,15 @@ def main():
         and to continuously read sensor data, log it, and update the screen.
     """
 #-- Variables required to control the device with buttons -------------
-    SCR_LAYOUT_NUMBER = 0 #.............................. Screen layout number (0, 1, 2, ...) to control which screen layout is currently displayed
-    SCR_MAX_LAYOUT_NUMBER = 4 #.......................... Maximum screen layout number (assuming we have 5 layouts: 0, 1, 2, 3, 4)
-    SCR_FULL_REFRESH = False #........................... Flag to indicate if a full screen refresh is requested by button press
-    BTN_PRESSED_FLAG = False #........................... Flag to indicate if a button has been pressed to request an immediate screen update
+    SCR_LAYOUT_NUMBER     = 0 #....................................... Screen layout number (0, 1, 2, ...) to control which screen layout is currently displayed
+    SCR_MAX_LAYOUT_NUMBER = 4 #....................................... Maximum screen layout number (assuming we have 5 layouts: 0, 1, 2, 3, 4)
+    SCR_FULL_REFRESH      = False #................................... Flag to indicate if a full screen refresh is requested by button press
 
 #-- Define K1, K2, K3, K4 pins for future use -------------------------
     btn_K1 = machine.Pin(21, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K1 pin as input with pull-up resistor on GP21
     btn_K2 = machine.Pin(20, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K2 pin as input with pull-up resistor on GP20
     btn_K3 = machine.Pin(19, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K3 pin as input with pull-up resistor on GP19
     btn_K4 = machine.Pin(18, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K4 pin as input with pull-up resistor on GP18
-
-#-- Define callback functions for button presses ----------------------
-    def isr_btn_k1(pin):
-        print("K1 button pressed, going to home screen...")
-        nonlocal BTN_PRESSED_FLAG, \
-            SCR_LAYOUT_NUMBER, \
-            SCR_FULL_REFRESH #................................. Declare nonlocal variables
-        SCR_LAYOUT_NUMBER = 0 #................................ Set screen layout number to 0 (home screen)
-        SCR_FULL_REFRESH = True #.............................. Flag to indicate if a full screen refresh is requested by button press
-        BTN_PRESSED_FLAG = True #.............................. Flag to indicate that a button has been pressed to request an immediate screen update
-        sleep(0.2) #........................................... Sleep for a short time to debounce the button press and avoid multiple triggers
-        return
-
-    def isr_btn_k2(pin):
-        print("K2 button pressed, going to previous screen...")
-        nonlocal BTN_PRESSED_FLAG, \
-            SCR_LAYOUT_NUMBER, \
-            SCR_FULL_REFRESH, \
-            SCR_MAX_LAYOUT_NUMBER #............................ Declare nonlocal variables
-        SCR_LAYOUT_NUMBER -= 1 #............................... Decrease screen layout number to go to the previous screen
-        if SCR_LAYOUT_NUMBER < 0:
-            SCR_LAYOUT_NUMBER = SCR_MAX_LAYOUT_NUMBER #........ Ensure screen layout number does not go below 0
-        SCR_FULL_REFRESH = True #.............................. Flag to indicate if a full screen refresh is requested by button press
-        BTN_PRESSED_FLAG = True #.............................. Flag to indicate that a button has been pressed to request an immediate screen update
-        sleep(0.2) #........................................... Sleep for a short time to debounce the button press and avoid multiple triggers
-        return
-
-    def isr_btn_k3(pin):
-        print("K3 button pressed, going to next screen...")
-        nonlocal BTN_PRESSED_FLAG, \
-            SCR_LAYOUT_NUMBER, \
-            SCR_FULL_REFRESH, \
-            SCR_MAX_LAYOUT_NUMBER #............................ Declare nonlocal variables
-        SCR_LAYOUT_NUMBER += 1 #............................... Increase screen layout number to go to the next screen
-        if SCR_LAYOUT_NUMBER > SCR_MAX_LAYOUT_NUMBER:
-            SCR_LAYOUT_NUMBER = 0 #............................ Ensure screen layout number does not exceed maximum
-        SCR_FULL_REFRESH = True #.............................. Flag to indicate if a full screen refresh is requested by button press
-        BTN_PRESSED_FLAG = True #.............................. Flag to indicate that a button has been pressed to request an immediate screen update
-        sleep(0.2) #........................................... Sleep for a short time to debounce the button press and avoid multiple triggers
-        return
-
-    def isr_btn_k4(pin):
-        print("K4 button pressed, refreshing screen...")
-        nonlocal BTN_PRESSED_FLAG, \
-            SCR_FULL_REFRESH #................................. Declare nonlocal variables
-        SCR_FULL_REFRESH = True #.............................. Flag to indicate if a full screen refresh is requested by button press
-        BTN_PRESSED_FLAG = True #.............................. Flag to indicate that a button has been pressed to request an immediate screen update
-        sleep(0.2) #........................................... Sleep for a short time to debounce the button press and avoid multiple triggers
-        return
-    
-#-- Attach interrupt handlers for button presses ----------------------
-    btn_K1.irq(trigger=Pin.IRQ_FALLING, handler=isr_btn_k1) #........ Attach interrupt handler for K1 button press (falling edge)
-    btn_K2.irq(trigger=Pin.IRQ_FALLING, handler=isr_btn_k2) #........ Attach interrupt handler for K2 button press (falling edge)
-    btn_K3.irq(trigger=Pin.IRQ_FALLING, handler=isr_btn_k3) #........ Attach interrupt handler for K3 button press (falling edge)
-    btn_K4.irq(trigger=Pin.IRQ_FALLING, handler=isr_btn_k4) #........ Attach interrupt handler for K4 button press (falling edge)
 
 #-- Set time refresh intervals to current time ------------------------
     last_full = ticks_ms()
@@ -349,11 +293,50 @@ def main():
         start_wait       = ticks_ms() #......................... Current time in ms
 
         while ticks_diff(ticks_ms(), start_wait) < WAIT_INTERVAL_MS:
-            if BTN_PRESSED_FLAG is True:
-                print("Button press detected, updating screen immediately...")
-                BTN_PRESSED_FLAG = False #....................... Reset the button pressed flag
-                break #.......................................... Exit the waiting loop to update the screen immediately
-            sleep(0.1) #......................................... Sleep for a short time to avoid busy-waiting and reduce CPU usage while waiting for the next update or button press
+            DELAY_DEBOUNCE_MS = 0.05 #......................... Debounce delay to avoid multiple triggers from a single button press
+
+            if btn_K1.value() == 0: #.......................... Check if K1 button is pressed (active low)
+                print(
+                    "K1 button press detected during wait, "
+                    "refreshing screen immediately..."
+                )
+                SCR_FULL_REFRESH = True #...................... Flag to indicate if a full screen refresh is requested by button press
+                sleep(DELAY_DEBOUNCE_MS) #..................... Sleep for a short time to debounce the button press and avoid multiple triggers
+                break #........................................ Exit the waiting loop to update the screen immediately
+            
+            elif btn_K2.value() == 0: #........................ Check if K2 button is pressed (active low)
+                print(
+                    "K2 button press detected during wait, "
+                    "going to previous screen immediately..."
+                )
+                SCR_LAYOUT_NUMBER -= 1 #....................... Decrease screen layout number to go to the previous screen
+                if SCR_LAYOUT_NUMBER < 0:
+                    SCR_LAYOUT_NUMBER = SCR_MAX_LAYOUT_NUMBER # Ensure screen layout number does not go below 0
+                SCR_FULL_REFRESH = True #...................... Flag to indicate if a full screen refresh is requested by button press
+                sleep(DELAY_DEBOUNCE_MS) #..................... Sleep for a short time to debounce the button press and avoid multiple triggers
+                break #........................................ Exit the waiting loop to update the screen immediately
+            
+            elif btn_K3.value() == 0: #........................ Check if K3 button is pressed (active low)
+                print(
+                    "K3 button press detected during wait, "
+                    "going to next screen immediately..."
+                )
+                SCR_LAYOUT_NUMBER += 1 #....................... Increase screen layout number to go to the next screen
+                if SCR_LAYOUT_NUMBER > SCR_MAX_LAYOUT_NUMBER:
+                    SCR_LAYOUT_NUMBER = 0 #.................... Ensure screen layout number does not exceed maximum
+                SCR_FULL_REFRESH = True #...................... Flag to indicate if a full screen refresh is requested by button press
+                sleep(DELAY_DEBOUNCE_MS) #..................... Sleep for a short time to debounce the button press and avoid multiple triggers
+                break #........................................ Exit the waiting loop to update the screen immediately
+            
+            elif btn_K4.value() == 0: #........................ Check if K4 button is pressed (active low)
+                print(
+                    "K4 button press detected during wait, "
+                    "returning back to home screen..."
+                )
+                SCR_LAYOUT_NUMBER = 0 #........................ Set screen layout number to 0 (home screen)
+                SCR_FULL_REFRESH = True #...................... Flag to indicate if a full screen refresh is requested by button press
+                sleep(DELAY_DEBOUNCE_MS) #..................... Sleep for a short time to debounce the button press and avoid multiple triggers
+                break #........................................ Exit the waiting loop to update the screen immediately
 
     #-- Print a separator for the next loop iteration ---------------------
         print("Updating screen with new sensor readings...")
