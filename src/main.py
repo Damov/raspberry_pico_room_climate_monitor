@@ -200,8 +200,13 @@ def main():
     #-- Get data frm sensors ----------------------------------------------
         print_mem("before loop step")
 
+        """
         CO2, temp, hum = sensor_scd41.read_measurement()
         _, pressure, _ = sensor_bme280.read_compensated()
+        """
+
+        CO2, _, _ = sensor_scd41.read_measurement()
+        temp, pressure, hum = sensor_bme280.read_compensated()
 
         print_mem("after sensors")
 
@@ -293,7 +298,7 @@ def main():
         start_wait       = ticks_ms() #......................... Current time in ms
 
         while ticks_diff(ticks_ms(), start_wait) < WAIT_INTERVAL_MS:
-            DELAY_DEBOUNCE_MS = 0.05 #......................... Debounce delay to avoid multiple triggers from a single button press
+            DELAY_DEBOUNCE_MS = 0.20 #......................... Debounce delay to avoid multiple triggers from a single button press
 
             if btn_K1.value() == 0: #.......................... Check if K1 button is pressed (active low)
                 print(
