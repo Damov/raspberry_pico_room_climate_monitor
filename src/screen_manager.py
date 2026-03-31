@@ -1,3 +1,15 @@
+"""
+=============================================================================
+screen_manager.py
+
+Screen manager for the e-ink display. It defines the different screen layouts
+and manages the drawing of data onto the display.
+
+Part of the Open source project: Raspberry Pico Room Climate Monitor
+See: https://github.com/Damov/raspberry_pico_room_climate_monitor
+=============================================================================
+"""
+
 import machine
 from drivers.screen_waveshare_2p7inch_module import EPD_2in7_V2
 from screen_writer import ScreenWriter
