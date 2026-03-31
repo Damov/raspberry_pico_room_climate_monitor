@@ -1,23 +1,13 @@
 """
-    error_handling.py
-    -----------------
-    This module provides functions for handling exceptions in a user-friendly way on the e-paper display.
-    It includes functions to show exceptions on the screen and to write exceptions to a log file.
+=============================================================================
+error_handling.py
 
-    Functions:
-    ----------
-    - show_exception_on_screen(e, show_traceback=False):
-        Displays an exception on the e-paper display in landscape mode.
-    - write_exception_to_file(e, file_path="exception.log"):
-        Writes the full exception traceback to a specified log file, overwriting any existing content.
+Error handling for the e-ink display. It provides functions for displaying
+exceptions on the screen and logging them to a file.
 
-    Usage:
-    ------
-        try:
-            # Some code that may raise an exception
-        except Exception as e:
-            show_exception_on_screen(e, show_traceback=True)  # Show full traceback on screen
-            write_exception_to_file(e)  # Log the exception to a file
+Part of the Open source project: Raspberry Pico Room Climate Monitor
+See: https://github.com/Damov/raspberry_pico_room_climate_monitor
+=============================================================================
 """
 
 def show_exception_on_screen(e, show_traceback=False):

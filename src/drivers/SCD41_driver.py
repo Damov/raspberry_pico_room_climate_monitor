@@ -1,3 +1,15 @@
+"""
+=============================================================================
+SCD41_driver.py
+
+SCD41 sensor driver for MicroPython on Raspberry Pi Pico. It provides methods
+to read CO2 concentration, temperature, and humidity from the SCD41 sensor.
+
+Part of the Open source project: Raspberry Pico Room Climate Monitor
+See: https://github.com/Damov/raspberry_pico_room_climate_monitor
+=============================================================================
+"""
+
 from machine import Pin, I2C
 import time
 

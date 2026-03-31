@@ -1,3 +1,18 @@
+"""
+=============================================================================
+logger.py
+
+Time-series logger with fixed-width bins for sensor values. This module
+provides a Logger class that allows you to log scalar values (e.g., pressure,
+temperature, etc.) over time, with automatic binning of values into specified
+time intervals. The Logger maintains a history of binned values and provides
+methods to retrieve the binned series for plotting.
+
+Part of the Open source project: Raspberry Pico Room Climate Monitor
+See: https://github.com/Damov/raspberry_pico_room_climate_monitor
+=============================================================================
+"""
+
 import time
 
 class Logger:

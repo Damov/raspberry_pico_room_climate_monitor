@@ -1,3 +1,16 @@
+"""
+=============================================================================
+main.py
+
+Main script for the Raspberry Pico Room Climate Monitor. It initializes sensors,
+logger, and screen, and continuously reads sensor data, logs it, and updates
+the screen.
+
+Part of the Open source project: Raspberry Pico Room Climate Monitor
+See: https://github.com/Damov/raspberry_pico_room_climate_monitor
+=============================================================================
+"""
+
 import machine
 from machine import Pin
 from utime import sleep, time, ticks_ms, ticks_diff

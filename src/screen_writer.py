@@ -1,4 +1,14 @@
-# screen_writer.py
+"""
+=============================================================================
+screen_writer.py
+
+Screen writer for the e-ink display. It provides high-level functions
+for drawing text and images on the display.
+
+Part of the Open source project: Raspberry Pico Room Climate Monitor
+See: https://github.com/Damov/raspberry_pico_room_climate_monitor
+=============================================================================
+"""
 
 # =====================================================================
 # TODO:
