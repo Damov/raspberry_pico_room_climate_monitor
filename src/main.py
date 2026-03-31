@@ -13,6 +13,8 @@ from drivers.BME280_driver import BME280
 
 from fonts import OpenSansBold_28, OpenSansBold_20
 
+from error_handling import show_exception_on_screen, write_exception_to_file
+
 def print_mem(label=""):
     """
         Print the current memory usage (free and allocated) 
@@ -29,41 +31,6 @@ def print_mem(label=""):
         f"free: {gc.mem_free()} ({100*gc.mem_free()/(gc.mem_free() + gc.mem_alloc()):.2f}) %"
     ) #................................................................. Print the label along with free and allocated memory in bytes for debugging purposes
 
-
-def write_exception_to_file(e, file_path="exception.log"):
-    """
-        Write the exception string to file while overwriting the
-        previous content if it exists.
-        
-        
-        Arguments:
-        ----------
-        e : Exception
-            The exception object to be logged.
-        file_path: str
-            The path to the log file where the exception should be written.
-            
-        Returns:
-        --------
-            None
-
-        Notes:
-        ------
-        - This function attempts to write the exception string to a specified log file.
-        - If the file cannot be written (e.g., due to filesystem issues), it will print
-          an error message to the console instead.
-        - The function does not raise exceptions itself; it handles any exceptions that
-          occur during the file writing process internally.
-    """
-    try:
-        import sys
-        with open(file_path, "w") as f:
-            sys.print_exception(e, f) #.......... Write the full exception traceback to the file
-            f.flush() #.......................... Ensure data is written to the file immediately
-    except Exception as e:
-        # If logging fails, at least try to print
-        print("Could not write exception to file:", e)
-    return
 
 def main():
     """
@@ -358,8 +325,8 @@ if __name__ == "__main__":
         main() #...................................................... Start the main function
     except Exception as e:
     #-- Write Exception to file -------------------------------------------
-        file_path = "exception.log"
-        write_exception_to_file(e, file_path=file_path)
+        write_exception_to_file(e, file_path="exception.log") #....... Write the exception traceback to a log file for later analysis
+        show_exception_on_screen(e, show_traceback=False) #........... Display the exception on the e‑paper screen
 
     #-- Blink the LED to indicate an error --------------------------------
         while True:

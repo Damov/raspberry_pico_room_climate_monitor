@@ -126,7 +126,7 @@ When an error occurs, the on-board LED of the Raspberry Pi Pico microcontroller 
 
 # Todo
 * Add five small circles on the right side of the screen to indicate which screen layout is currently shown 
-* Display any unhandled exception directly on the screen, or alternatively, show a dedicated crash screen indicating that the system has failed.
+* ~~Display any unhandled exception directly on the screen, or alternatively, show a dedicated crash screen indicating that the system has failed.~~
 * Define all configuration parameters in a config.ini file and load them at runtime.
 * Add a barometer function and a simple weather forecast based on pressure trends over the last 3 hours.
 * SCD41 module is actually connected on I2C bus 1 at scl_pin=GP3 and sda_pin=GP2, but is documented in the readme at I2C bus 0 (to be corrected).
