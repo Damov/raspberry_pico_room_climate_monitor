@@ -513,38 +513,28 @@ class ScreenManager:
 
         self.screen_writer.change_font(OpenSansBold_20)  #.... Change the font back to the default for the next screen
 
-    #-- Add information -----------------------------------------------
-        self.screen_writer.add_text(
-                text = f"Current: {current_value:2.1f} {unit}",
-                x = 10,
-                y = 110,
-                invert = True
-            )
-        
+    #-- Stack Current, Min, and Max with one aligned value column -------
         if logger.count() > 0:
-        #-- Get the minimal and maximal value -------------------------
-            value_min = logger.min()
-            value_max = logger.max()
-        #-- Corect by the current value -------------------------------
-            if current_value < value_min:
-                value_min = current_value
-            if current_value > value_max:
-                value_max = current_value
-        #-- Plot text -------------------------------------------------
-            separator = "/" if unit == "hPa" else " / " #.... Keep four-digit pressure values and their unit on one line
-            self.screen_writer.add_text(
-                    text = f"Min/Max: {value_min:2.1f}{separator}{value_max:2.1f} {unit}",
-                    x = 10,
-                    y = 140,
-                    invert = True
-                )
+            values = (current_value, min(logger.min(), current_value),
+                      max(logger.max(), current_value))
         else:
-            self.screen_writer.add_text(
-                    text = f"Min/Max: n/a {unit}",
-                    x = 10,
-                    y = 140,
-                    invert = True
-                )
+            values = (current_value, None, None)
+        texts = tuple(f"{value:.1f} {unit}" if value is not None else f"n/a {unit}" for value in values)
+        rows = (108, 130, 152)
+        value_font = OpenSansBold_20
+        self.screen_writer.change_font(value_font)
+        if any(self.screen_writer.writer.stringlen(text) > 154 for text in texts):
+            value_font = OpenSansBold_12 #.................. Use one common size for the aligned value rows
+        for heading, text, y in zip(("Current", "Min", "Max"), texts, rows):
+            self.screen_writer.change_font(OpenSansBold_20)
+            self.screen_writer.add_text(heading, 10, y, invert=True)
+            self.screen_writer.change_font(value_font)
+            width = self.screen_writer.writer.stringlen(text)
+            if width > 154:
+                raise ValueError("History value exceeds its column: " + text)
+            value_y = y + (OpenSansBold_20.height() - value_font.height()) // 2
+            self.screen_writer.add_text(text, 100, value_y, invert=True)
+        self.screen_writer.change_font(OpenSansBold_20)
 
     #-- Return --------------------------------------------------------
         return

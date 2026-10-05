@@ -88,3 +88,34 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual(self.logger.count(), 2)
         self.assertTrue(all(bar[2] > 0 for bar in self.plot()))
 
+    def test_statistics_fit_all_units_in_three_rows_with_one_value_column(self):
+        for unit, current in (('°C', -100.0), ('%', 100.0), ('ppm', 99999.0), ('hPa', 1018.2)):
+            with self.subTest(unit=unit):
+                self.logger = self.logger_class(86400, 1800)
+                self.add(0, current - 2)
+                self.manager._screen2_template(current, self.logger, unit, '24h History')
+                headings = [item for item in self.writer.texts if item[0] in ('Current', 'Min', 'Max')]
+                values = [item for item in self.writer.texts if item[1] == 100]
+                self.assertEqual([item[0] for item in headings], ['Current', 'Min', 'Max'])
+                self.assertEqual([item[2] for item in headings], [108, 130, 152])
+                self.assertTrue(all(item[1] == 10 for item in headings))
+                self.assertEqual([x for text, x, y, width, height in values], [100, 100, 100])
+                self.assertEqual([item[0] for item in values],
+                                 [f'{current:.1f} {unit}', f'{current - 2:.1f} {unit}', f'{current:.1f} {unit}'])
+                self.assertTrue(all(item[2] == y for item, y in zip(values, (108, 130, 152))))
+                summary = [item for item in self.writer.texts if item[2] >= 108]
+                for index, (text, x, y, width, height) in enumerate(summary):
+                    for other, ox, oy, ow, oh in summary[index + 1:]:
+                        self.assertFalse(x < ox + ow and ox < x + width and
+                                         y < oy + oh and oy < y + height, (text, other))
+
+    def test_empty_statistics_show_current_and_na_extrema(self):
+        self.manager._screen2_template(1018.2, self.logger, 'hPa', '24h Pressure History')
+        self.assertEqual([text for text, x, y, w, h in self.writer.texts if x == 100],
+                         ['1018.2 hPa', 'n/a hPa', 'n/a hPa'])
+
+    def test_statistics_use_a_common_smaller_font_for_large_values(self):
+        self.manager._screen2_template(123456789012.0, self.logger, 'ppm', '24h CO2 History')
+        values = [item for item in self.writer.texts if item[1] == 100]
+        self.assertEqual(len({item[4] for item in values}), 1)
+        self.assertLess(values[0][4], 20)
