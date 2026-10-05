@@ -31,6 +31,8 @@ class PreviewWriter:
         self.texts = []
         self.icons = []
         self.pixels = {}
+        self.rectangles = []
+        self.lines = []
         self.image = image
         if image is not None:
             from PIL import ImageDraw
@@ -46,10 +48,13 @@ class PreviewWriter:
         self.texts.clear()
         self.icons.clear()
         self.pixels.clear()
+        self.rectangles.clear()
+        self.lines.clear()
         if self.image is not None:
             self.draw.rectangle((0, 0, 263, 175), fill=255 if color else 0)
 
     def line(self, x0, y0, x1, y1, color):
+        self.lines.append((x0, y0, x1, y1, color))
         for x, y in ((x0, y0), (x1, y1)):
             assert 0 <= x < self.width and 0 <= y < self.height, (x, y)
         if self.image is not None:
@@ -78,6 +83,20 @@ class PreviewWriter:
 
     def vline(self, x, y, length, color):
         self.line(x, y, x, y + length - 1, color)
+
+    def hline(self, x, y, length, color):
+        if length > 0:
+            self.line(x, y, x + length - 1, y, color)
+
+    def rect(self, x, y, width, height, color, fill=False):
+        assert width > 0 and height > 0, (x, y, width, height)
+        assert 0 <= x and x + width <= self.width
+        assert 0 <= y and y + height <= self.height
+        self.rectangles.append((x, y, width, height, color, fill))
+        if self.image is not None:
+            self.draw.rectangle((x, y, x + width - 1, y + height - 1),
+                                fill=(255 if color else 0) if fill else None,
+                                outline=255 if color else 0)
 
     def add_text_horizontal_center(self, text, y, x_start=0, x_end=None, invert=True):
         x_end = self.width if x_end is None else x_end

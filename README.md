@@ -101,6 +101,8 @@ Set `ALTITUDE_M = 50.0` near the top of `src/main.py` to the device height in me
 
 For a pixel-exact host preview using the bundled fonts, install Pillow and run `python3 tools/preview_start_screen.py --co2 2000 --output /tmp/climate-start-screen.png`. The preview does not access the device.
 
+The chart redraws with each 30-second measurement using 30-minute bin averages, including the active bin. A nonempty active bin is visible immediately, even when its elapsed time is less than one pixel on the 24-hour scale. History is held in RAM and starts over after a device restart or firmware upload; it is not persisted.
+
 Full page refreshes reinitialize the display controller, restore the complete RAM write window, and populate both image RAM planes. Partial updates use the reference driver's reset and border configuration and synchronize the reference image after completing the refresh. Normal updates follow the 30-second measurement cadence; after five soft updates, the next update performs a cleaning full refresh (approximately every three minutes). Only one refresh mode runs per cycle. Manual full refreshes restart the cleaning count and refresh timers. Automatic five-minute fast updates are removed; the fast-refresh API remains available and initializes its waveform before use. If drawing runs out of memory, the page is retried without refreshing an incomplete frame; three consecutive failures use the existing error handler.
 
 **Firmware requirement:** MicroPython **1.27 or newer** for the Pico 2 (RP2 port), with hard interrupt timer support. Older firmware must be upgraded before running this version. Upload the new `button_controller.py` file together with `main.py` and the other files in `src/`.

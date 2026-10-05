@@ -561,13 +561,14 @@ class ScreenManager:
         """
         Draw a barplot in screen coords (x_scr_min/y_scr_min) - (x_scr_max/y_scr_max),
         where x/y are linearly mapped from logical ranges [x_min,x_max] and
-        [y_min,y_max]. Samples is list of (x_value, y_value). Bars are stretched
-        accordingly and separated by a 1px white line. Values outside the
+        [y_min,y_max]. Samples is an oldest-first list of (age_seconds, y_value). Each bin
+        extends toward its next newer bin, with the active bin ending at Now.
+        Subpixel bins remain visible and separators never erase narrow bars. Values outside the
         [y_min,y_max] logical range are cropped to the physical box.
         """
         fb = self.screen_writer.fb #...................................... Get the frame buffer from the screen writer
-        #samples = samples[::-1] #........................................ Reverse the samples to have the most recent one at the end of the list
-
+        plot_left, plot_right = x_scr_min + 1, x_scr_max - 1
+        plot_top, plot_bottom = y_scr_min + 1, y_scr_max - 1
 
     #-- Invert bar along x-axis ----------------------------------------------
         x_min = -x_max
@@ -578,29 +579,28 @@ class ScreenManager:
         def _map_x_value(x_value):
             # Map logical x value to screen x coordinate
             if x_value < x_min:
-                return x_scr_min
+                return plot_left
             elif x_value > x_max:
-                return x_scr_max
+                return plot_right
             else:
-                return int(x_scr_min + (x_value - x_min) / (x_max - x_min) * (x_scr_max - x_scr_min))
+                return int(plot_left + (x_value - x_min) / (x_max - x_min) * (plot_right - plot_left))
             
         def _map_y_value(y_value):
             # Map logical y value to screen y coordinate (inverted)
             if y_value < y_min:
-                return y_scr_max
+                return plot_bottom
             elif y_value > y_max:
-                return y_scr_min
+                return plot_top
             else:
-                return int(y_scr_max - (y_value - y_min) / (y_max - y_min) * (y_scr_max - y_scr_min))
+                return int(plot_bottom - (y_value - y_min) / (y_max - y_min) * (plot_bottom - plot_top))
             
     #-- Iterate over samples and plot bars -------------------------------------------------------------
         for k in range(len(samples)):
         #-- Select physical x values for the left and right edge of the bar ----------------------------
-            if k < 1:
-                x_value_left = 0 #................. For the first bar, we can set the left edge to the start of the x range
-            else:
-                x_value_left = samples[k-1][0] #... Phsyical x value in seconds ago for the left edge of the bar (previous sample)
-            x_value_right = samples[k][0] #........ Phsyical x value in seconds ago for the right edge of the bar (current sample)
+            x_value_left = samples[k][0] #................... Older edge of this bin
+            x_value_right = samples[k + 1][0] if k + 1 < len(samples) else 0
+            if x_value_right <= x_min or x_value_left > x_max:
+                continue #.................................. Skip intervals entirely outside the history window
 
         #-- Select physical y value of the bar ---------------------------------------------------------
             y_value = samples[k][1] #.............. Physical y value in the given units for the current sample
@@ -610,26 +610,32 @@ class ScreenManager:
             x_bar_right  = _map_x_value(x_value_right) #. Map logical x to screen x for the left edge of the bar
             y_bar        = _map_y_value(y_value) #....... Map logical y to screen y for the top of the bar (inverted because screen y increases downwards)
 
+            if x_bar_right <= x_bar_left:
+                x_bar_left = max(plot_left, min(x_bar_left, plot_right - 1))
+                x_bar_right = x_bar_left + 1 #............... Keep a nonempty subpixel bin visible
+            if y_bar >= plot_bottom:
+                continue
+
         #-- Draw filled bar as a rectangle -------------------------------------------------------------
             fb.rect(
                 x_bar_left,
                 y_bar,
                 x_bar_right-x_bar_left,
-                y_scr_max - y_bar,
+                plot_bottom - y_bar,
                 color,
                 True
             )
         
-        #-- Plot white vertical bars to separate the bars ------------------------------------------------
-            fb.vline(x_bar_right, y_scr_min, y_scr_max, 0xFF)
-            fb.vline(x_bar_left, y_scr_min, y_scr_max, 0xFF)
+        #-- Separate bins without erasing a one-pixel bar ---------------------
+            if x_bar_right - x_bar_left > 1:
+                fb.vline(x_bar_left, plot_top, plot_bottom - plot_top, 0xFF)
 
-    #-- Plot 5 bars ---------------------------------------------------
+    #-- Keep horizontal grid lines inside the plot frame --------------------
         N = 5
-        dY = (y_scr_max - y_scr_min) / N
-        for i in range(N + 1):
-            y = int(y_scr_min + i * dY)
-            fb.hline(x_scr_min, y, x_scr_max - x_scr_min + 1, 0xFF)
+        dY = (plot_bottom - plot_top) / N
+        for i in range(1, N):
+            y = int(plot_top + i * dY)
+            fb.hline(plot_left, y, plot_right - plot_left, 0xFF)
 
     #-- Return -----------------------------------------------------------------------------------------
         return
