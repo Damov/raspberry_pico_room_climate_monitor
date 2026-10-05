@@ -34,6 +34,7 @@
 # 2026-02-22 : added method display_Landscape_Partial()
 # 2026-10-05 : restore controller state and RAM addresses for page updates
 # 2026-10-05 : maintain both image RAM planes across full and soft updates
+# 2026-10-05 : shorten controller waits and batch landscape SPI transfers
 # =============================================================================
 
 from machine import Pin, SPI
@@ -95,6 +96,7 @@ class EPD_2in7_V2:
         self.buffer_1Gray_Landscape = bytearray(self.height * self.width // 8)
         self.buffer_1Gray_Portrait = bytearray(self.height * self.width // 8)
         self.buffer_4Gray = bytearray(self.height * self.width // 4)
+        self._landscape_row = bytearray((self.width + 7) // 8) #.... Reuse one row for batched SPI transfers
         
         self.image1Gray_Landscape = framebuf.FrameBuffer(self.buffer_1Gray_Landscape, self.height, self.width, framebuf.MONO_VLSB)
         self.image1Gray_Portrait = framebuf.FrameBuffer(self.buffer_1Gray_Portrait, self.width, self.height, framebuf.MONO_HLSB)
@@ -122,11 +124,11 @@ class EPD_2in7_V2:
     # Hardware reset
     def reset(self):
         self.digital_write(self.reset_pin, 1)
-        self.delay_ms(200) 
+        self.delay_ms(20)
         self.digital_write(self.reset_pin, 0)
         self.delay_ms(2)
         self.digital_write(self.reset_pin, 1)
-        self.delay_ms(200)   
+        self.delay_ms(20)
 
     def send_command(self, command):
         self.digital_write(self.dc_pin, 0)
@@ -148,9 +150,9 @@ class EPD_2in7_V2:
         
     def ReadBusy(self):
         print("e-Paper busy")
-        while(self.digital_read(self.busy_pin) == 1):      #  1: idle, 0: busy
+        while(self.digital_read(self.busy_pin) == 1):      #  1: busy, 0: ready
             self.delay_ms(2)
-        self.delay_ms(200) 
+        self.delay_ms(20)
         print("e-Paper busy release")
         
     def TurnOnDisplay(self):
@@ -357,9 +359,15 @@ class EPD_2in7_V2:
 
     #-- Transfer the frame using the existing landscape orientation -------
         self.send_command(ram_command)
-        for j in range(Height):
-            for i in range(Width):
-                self.send_data(image[(Width - 1 - i) * Height + j])
+        self.digital_write(self.dc_pin, 1)
+        self.digital_write(self.cs_pin, 0)
+        try:
+            for j in range(Height):
+                for i in range(Width):
+                    self._landscape_row[i] = image[(Width - 1 - i) * Height + j]
+                self.spi.write(self._landscape_row) #...... Send 22 bytes per row without allocating per pixel
+        finally:
+            self.digital_write(self.cs_pin, 1) #........... Release chip-select even if a transfer fails
 
     def display_Landscape(self, image):
     #-- Restore full-refresh mode before sending a new page ---------------
