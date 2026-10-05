@@ -105,8 +105,12 @@ class ScreenManager:
             )
 
     #-- Add CO2 --------------------------------------------------------
+        co2_value = f"{CO2:4.0f}"
+        co2_text = f"{co2_value} ppm"
+        if self.screen_writer.writer.stringlen(co2_text) > self.screen_writer.width - 145:
+            co2_text = co2_value #.......................... Hide the unit when the number needs more room; avoid wrapping
         self.screen_writer.add_text(
-                text = f"{CO2:4.0f} ppm",
+                text = co2_text,
                 x = 145,
                 y = 120,
                 invert = True
