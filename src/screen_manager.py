@@ -543,8 +543,9 @@ class ScreenManager:
             if current_value > value_max:
                 value_max = current_value
         #-- Plot text -------------------------------------------------
+            separator = "/" if unit == "hPa" else " / " #.... Keep four-digit pressure values and their unit on one line
             self.screen_writer.add_text(
-                    text = f"Min/Max: {value_min:2.1f} / {value_max:2.1f} {unit}",
+                    text = f"Min/Max: {value_min:2.1f}{separator}{value_max:2.1f} {unit}",
                     x = 10,
                     y = 140,
                     invert = True
