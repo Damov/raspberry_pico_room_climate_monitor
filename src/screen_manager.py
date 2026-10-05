@@ -80,29 +80,31 @@ class ScreenManager:
     #-- Draw CO2 scale, assessment, and current value -------------------
         self._draw_co2_gauge(CO2)
 
-    #-- Keep temperature and humidity on the right ---------------------
-        self._start_text("Temperature", 145, 260, 8, (OpenSansBold_12,))
-        self._start_text(f"{temp:2.1f} °C", 145, 260, 25)
-        self._start_text("Humidity", 145, 260, 62, (OpenSansBold_12,))
-        self._start_text(f"{hum:2.1f} %", 145, 260, 79)
-
-    #-- Show approximate sea-level pressure and its assessment ---------
+    #-- Place larger climate symbols beside their values ---------------
+        self.screen_writer.add_image("img/thermometer.bin", 16, 32, x=143, y=12,
+                                     invert_colors=False, show_after=False)
+        self._start_text(f"{temp:2.1f} °C", 168, 260, 14, center_y=28)
+        self.screen_writer.add_image("img/water-drop.bin", 22, 32, x=140, y=66,
+                                     invert_colors=False, show_after=False)
+        self._start_text(f"{hum:2.1f} %", 168, 260, 68, center_y=82)
+    #-- Show pressure and status without a heading or symbol ------------
         sea_pressure = self._sea_level_pressure(pressure)
-        self._start_text("Pressure (sea)", 145, 260, 116, (OpenSansBold_12,))
-        self._start_text(f"{sea_pressure:.1f} hPa", 145, 260, 132,
+        self._start_text(f"{sea_pressure:.1f} hPa", 145, 260, 122,
                          (OpenSansBold_20, OpenSansBold_12))
-        self._start_text(self._pressure_status(sea_pressure), 145, 260, 154,
+        self._start_text(self._pressure_status(sea_pressure), 145, 260, 148,
                          (OpenSansBold_20, OpenSansBold_12))
         self.screen_writer.change_font(OpenSansBold_28) #.... Restore the default font for other pages
         return
 
-    def _start_text(self, text, x_start, x_end, y, fonts=None):
+    def _start_text(self, text, x_start, x_end, y, fonts=None, center_y=None):
         """Center one line in its column, selecting a font that fits."""
         if fonts is None:
             fonts = (OpenSansBold_28, OpenSansBold_20, OpenSansBold_12)
         for font in fonts:
             self.screen_writer.change_font(font)
             if self.screen_writer.writer.stringlen(text) <= x_end - x_start:
+                if center_y is not None:
+                    y = center_y - font.height() // 2 #..... Keep smaller fallback fonts aligned with the icon
                 self.screen_writer.add_text_horizontal_center(
                     text, y, x_start=x_start, x_end=x_end, invert=True)
                 return
@@ -141,7 +143,13 @@ class ScreenManager:
         """Draw an eight-pixel ring filled up to the current CO2 value."""
         fb = self.screen_writer.fb
         cx, cy = 67, 82
-        self._start_text("CO2", 5, 130, 5, (OpenSansBold_20,))
+        self.screen_writer.change_font(OpenSansBold_20)
+        heading_width = self.screen_writer.writer.stringlen("CO2")
+        heading_x = (135 - heading_width - 5 - 18) // 2 #.... Center the CO2 heading and leaf as one group
+        self.screen_writer.add_text("CO2", heading_x, 5, invert=True)
+        self.screen_writer.add_image("img/leaf.bin", 18, 18,
+                                     x=heading_x + heading_width + 5, y=6,
+                                     invert_colors=False, show_after=False)
 
     #-- Fill four separated sectors without an extra image buffer ------
         boundaries = (400, 800, 1200, 2000, 2500)

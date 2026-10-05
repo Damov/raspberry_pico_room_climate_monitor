@@ -1,4 +1,4 @@
-"""Check start-screen assessments, altitude correction, and text placement."""
+"""Check start-screen assessments, icons, and text placement."""
 import importlib.util
 import math
 from pathlib import Path
@@ -90,19 +90,49 @@ class StartScreenTests(unittest.TestCase):
                                 (1020, 'Normal'), (1020.1, 'High')):
             self.assertEqual(self.manager._pressure_status(value), expected)
 
-    def test_pressure_display_and_status_both_use_corrected_value(self):
+    def test_pressure_value_and_status_are_shown_without_a_heading(self):
         self.manager.screen1(22.5, 45, 1015, 800, None, None, None)
         texts = [item[0] for item in self.writer.texts]
+        self.assertFalse(any('Pressure' in text for text in texts))
         self.assertIn(f'{self.manager._sea_level_pressure(1015):.1f} hPa', texts)
         self.assertIn('High', texts)
         self.assertEqual(self.writer.font, self.namespace['OpenSansBold_28'])
+
+    def test_larger_climate_icons_precede_values_in_separate_rows(self):
+        self.manager.screen1(22.5, 45, 1013.2, 800, None, None, None)
+        texts = [item[0] for item in self.writer.texts]
+        self.assertNotIn('Temperature', texts)
+        self.assertNotIn('Humidity', texts)
+        self.assertIn('CO2', texts)
+        self.assertNotIn('Pressure (sea)', texts)
+        self.assertEqual([item[0] for item in self.writer.icons],
+                         ['img/leaf.bin', 'img/thermometer.bin', 'img/water-drop.bin'])
+        for name, x, y, width, height in self.writer.icons:
+            data = (ROOT / 'src' / name).read_bytes()
+            self.assertEqual(set(data), {0, 255})
+            self.assertEqual(len(data), width * height)
+            if name != 'img/leaf.bin':
+                self.assertEqual(height, 32)
+                value = next(item for item in self.writer.texts
+                             if ('°C' if 'thermometer' in name else '%') in item[0])
+                self.assertLess(x + width, value[1])
+                self.assertEqual(y + height // 2, value[2] + value[4] // 2)
+
+    def test_large_negative_value_uses_a_centered_fallback_font(self):
+        self.manager.screen1(-100.0, 100.0, 1013.2, 800, None, None, None)
+        for text, x, y, width, height in self.writer.texts:
+            if '°C' in text:
+                self.assertLessEqual(width, 92)
+                self.assertLess(height, 28)
+                self.assertEqual(y + height // 2, 28)
 
     def test_all_text_fits_and_does_not_overlap(self):
         for co2 in (400, 799, 800, 1200, 2000, 2500, 10000, 99999):
             with self.subTest(co2=co2):
                 self.manager.screen1(99.9, 100.0, 1018.2, co2, None, None, None)
-                for index, (text, x, y, width, height) in enumerate(self.writer.texts):
-                    for other, ox, oy, ow, oh in self.writer.texts[index + 1:]:
+                rectangles = self.writer.texts + self.writer.icons
+                for index, (text, x, y, width, height) in enumerate(rectangles):
+                    for other, ox, oy, ow, oh in rectangles[index + 1:]:
                         overlap = x < ox + ow and ox < x + width and y < oy + oh and oy < y + height
                         self.assertFalse(overlap, (text, other))
 
