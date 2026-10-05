@@ -4,7 +4,7 @@ A compact system based on the Raspberry Pi Pico designed for monitoring indoor c
 
 # Screenshots
 
-The following images illustrate the assembly of the system on a breadboard using jumper wires for all signal and power connections. The display is configured with a standard layout, presenting 15 minutes of historical data on the left side and three primary metrics on the right side: temperature, humidity, and CO₂ concentration. The on-screen buttons are currently not utilized; however, they are reserved for future functionality to allow switching between different display layouts.
+The following images illustrate the assembly of the system on a breadboard using jumper wires for all signal and power connections. The display is configured with a standard layout, presenting 15 minutes of historical data on the left side and three primary metrics on the right side: temperature, humidity, and CO₂ concentration. The four buttons select the home screen, previous layout, next layout, or a full refresh of the current view.
 
 <p align="center">
   <img src="images/assembly_01.jpeg" width="600" alt="Assembly of the system, picture 1">
@@ -82,12 +82,20 @@ The display is wired using a JST‑to‑Dupont cable (<b>PH2.0, 20 cm, 8‑pin
 * RST → GP12
 * BUSY → GP13
 
-To control the screen, four buttons (K1, K2, K3, K4) are used. Currently, five screen layouts are defined. The K1 button returns to screen 0 (the home screen), K2 switches to the previous screen layout, K3 advances to the next layout, and K4 refreshes the current view, as e‑Paper displays can sometimes show visual artifacts. The buttons share a common ground connection on the <b>Raspberry Pi Pico microcontroller</b>, with the <b>GP21</b> pin assigned to <b>K1</b>, <b>GP20</b> to <b>K2</b>, <b>GP19</b> to <b>K3</b>, and <b>GP18</b> to <b>K4</b> button:
+To control the screen, four buttons (K1, K2, K3, K4) are used. Currently, five screen layouts are defined. The K4 button returns to screen 0 (the home screen), K3 (Up) switches to the previous screen layout, K2 (Down) advances to the next layout, and K1 refreshes the current view, as e‑Paper displays can sometimes show visual artifacts. The buttons share a common ground connection on the <b>Raspberry Pi Pico microcontroller</b>, with the <b>GP21</b> pin assigned to <b>K1</b>, <b>GP20</b> to <b>K2</b>, <b>GP19</b> to <b>K3</b>, and <b>GP18</b> to <b>K4</b> button:
 
 * GND → K1 → GP21
 * GND → K2 → GP20
 * GND → K3 → GP19
 * GND → K4 → GP18
+
+Holding a button does nothing. Each completed press triggers one action only after the button is released. Both pressing and releasing must remain stable for 40 ms; very brief taps or glitches are ignored. Navigation wraps between layouts 0 and 4. Buttons held during startup must be released before they can trigger an action; that initial release does not trigger an action.
+
+Buttons are sampled every 10 ms independently of sensor reads and e-paper refreshes. Completed clicks released while the display is busy are queued and applied in order once it is ready; the resulting layout is refreshed once per batch using the latest sensor data. Simultaneous releases are processed in K1, K2, K3, K4 order. The queue holds 32 presses; if it fills, additional presses are discarded and an overflow message is printed. Button actions do not trigger extra sensor reads or restart the 30-second measurement interval.
+
+Full page refreshes reinitialize the display controller and restore the complete RAM write window before transmitting the frame. If drawing runs out of memory, the page is retried without refreshing an incomplete frame; three consecutive failures use the existing error handler.
+
+**Firmware requirement:** MicroPython **1.27 or newer** for the Pico 2 (RP2 port), with hard interrupt timer support. Older firmware must be upgraded before running this version. Upload the new `button_controller.py` file together with `main.py` and the other files in `src/`.
 
 ## Firmware installation
 
@@ -161,6 +169,17 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 * <a href="https://github.com/peterhinch"><b>Peter Hinch</b></a>: For the writer class used for text rendering and font_to_py for fonts.
 * <a href="https://github.com/waveshareteam/Pico_ePaper_Code"><b>Waveshare</b></a>: For the ePaper display and driver.
 display 
+
+## Button regression tests
+
+Run the simulated button and main-loop tests on a computer from the repository root:
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+On the Pico, verify K4 Home, K3 Up/Previous, K2 Down/Next, and K1 Refresh; hold each button to check that nothing happens until release, then confirm that it triggers once. Press Next twice during a full refresh and confirm that the resulting page advances twice. These hardware checks also verify timer operation with the installed firmware and the actual button contacts.
+
 
 # Disclaimer
 <b>This project and all associated files, documentation, and source code are provided “as is” without any express or implied warranties, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, and non‑infringement. The author and contributors of this repository assume no responsibility or liability for any direct, indirect, incidental, or consequential damages that may occur through the use, modification, or distribution of the software and hardware designs contained herein. This includes, but is not limited to, hardware damage, data loss, malfunctioning devices, or personal injury that may arise from incorrect wiring, improper configuration, or misuse of the provided code and documentation. Users are encouraged to review, test, and verify all code before deploying it on any system. If you choose to use this project, you do so entirely at your own risk. By downloading, copying, modifying, or using any part of this project, you acknowledge that you have read, understood, and agree to this disclaimer.</b>
