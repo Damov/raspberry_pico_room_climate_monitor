@@ -12,14 +12,14 @@ See: https://github.com/Damov/raspberry_pico_room_climate_monitor
 """
 
 import machine
-from machine import Pin
-from utime import sleep, time, ticks_ms, ticks_diff
+from utime import sleep, sleep_ms, ticks_ms, ticks_diff
 import gc
 
 from drivers.screen_waveshare_2p7inch_module import EPD_2in7_V2
 from screen_manager import ScreenManager
 from screen_writer import ScreenWriter
 from logger import Logger
+from button_controller import ButtonController, apply_button
 
 from drivers.SCD41_driver import SCD41
 from drivers.BME280_driver import BME280
@@ -46,20 +46,30 @@ def print_mem(label=""):
 
 
 def main():
+    """Initialize button sampling and always stop it when the application exits."""
+#-- Define active-low K1, K2, K3, K4 inputs ----------------------------
+    pins = tuple(
+        machine.Pin(number, machine.Pin.IN, machine.Pin.PULL_UP)
+        for number in (21, 20, 19, 18)
+    ) #............................................................... GP21 Refresh, GP20 Next, GP19 Previous, GP18 Home
+    buttons = ButtonController(pins)
+    try:
+        _run_monitor(buttons)
+    finally:
+        buttons.close() #............................................. Stop the timer on errors and KeyboardInterrupt
+
+
+def _run_monitor(buttons):
     """
-        Main function to initialize sensors, logger, and screen,
-        and to continuously read sensor data, log it, and update the screen.
+        Initialize sensors, logger, and screen, then process button events
+        independently of the periodic sensor measurements.
     """
 #-- Variables required to control the device with buttons -------------
-    SCR_LAYOUT_NUMBER     = 0 #....................................... Screen layout number (0, 1, 2, ...) to control which screen layout is currently displayed
-    SCR_MAX_LAYOUT_NUMBER = 4 #....................................... Maximum screen layout number (assuming we have 5 layouts: 0, 1, 2, 3, 4)
-    SCR_FULL_REFRESH      = False #................................... Flag to indicate if a full screen refresh is requested by button press
-
-#-- Define K1, K2, K3, K4 pins for future use -------------------------
-    btn_K1 = machine.Pin(21, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K1 pin as input with pull-up resistor on GP21
-    btn_K2 = machine.Pin(20, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K2 pin as input with pull-up resistor on GP20
-    btn_K3 = machine.Pin(19, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K3 pin as input with pull-up resistor on GP19
-    btn_K4 = machine.Pin(18, machine.Pin.IN, machine.Pin.PULL_UP) #... Define K4 pin as input with pull-up resistor on GP18
+    SCR_LAYOUT_NUMBER     = 0 #....................................... Current screen layout (0-4)
+    SCR_MAX_LAYOUT_NUMBER = 4 #....................................... Five available screen layouts
+    SCR_FULL_REFRESH      = False #................................... Full refresh requested by a button event
+    WAIT_INTERVAL_MS      = 30 * 1000 #............................... Sensor sampling interval in milliseconds
+    last_measurement      = None #................................... Read sensors before drawing the first page
 
 #-- Set time refresh intervals to current time ------------------------
     last_full = ticks_ms()
@@ -174,38 +184,57 @@ def main():
         ) #............................................. Initialize SCD41 sensor
     
     while True:
-    #-- Garbage collection to free up memory ------------------------------
-        gc.collect() #..................................................... Run garbage collection to free up memory before the next loop iteration
+    #-- Check if a new sensor measurement is due --------------------------
+        now = ticks_ms()
+        measurement_due = (
+            last_measurement is None or
+            ticks_diff(now, last_measurement) >= WAIT_INTERVAL_MS
+        )
+        if measurement_due:
+        #-- Read and log the latest sensor measurements -----------------------
+            gc.collect() #................................ Free memory before reading the sensors
+            print_mem("before loop step")
 
-    #-- Get data frm sensors ----------------------------------------------
-        print_mem("before loop step")
+            CO2, _, _ = sensor_scd41.read_measurement()
+            temp, pressure, hum = sensor_bme280.read_compensated()
 
-        """
-        CO2, temp, hum = sensor_scd41.read_measurement()
-        _, pressure, _ = sensor_bme280.read_compensated()
-        """
+            print_mem("after sensors")
 
-        CO2, _, _ = sensor_scd41.read_measurement()
-        temp, pressure, hum = sensor_bme280.read_compensated()
+        #-- Add new samples to the loggers ------------------------------------
+            now_timestamp = ticks_ms() #............................. Current time in ms
 
-        print_mem("after sensors")
+            logger_pressure_shortterm.add(now_timestamp, pressure) #. Add new pressure sample to the short-term logger
+            logger_temperature_shortterm.add(now_timestamp, temp) #.. Add new temperature sample to the short-term logger
+            logger_humidity_shortterm.add(now_timestamp, hum) #...... Add new humidity sample to the short-term logger
+            logger_co2_shortterm.add(now_timestamp, CO2) #........... Add new CO2 sample to the short-term logger
 
-    #-- Add new samples to the loggers ------------------------------------
-        now_timestamp = ticks_ms() #............................. Current time in ms
+            logger_pressure_24h.add(now_timestamp, pressure) #....... Add new pressure sample to the short-term logger
+            logger_temperature_24h.add(now_timestamp, temp) #........ Add new temperature sample to the 24h logger
+            logger_humidity_24h.add(now_timestamp, hum) #............ Add new humidity sample to the 24h logger
+            logger_co2_24h.add(now_timestamp, CO2) #................. Add new CO2 sample to the 24h logger
 
-        logger_pressure_shortterm.add(now_timestamp, pressure) #. Add new pressure sample to the short-term logger
-        logger_temperature_shortterm.add(now_timestamp, temp) #.. Add new temperature sample to the short-term logger
-        logger_humidity_shortterm.add(now_timestamp, hum) #...... Add new humidity sample to the short-term logger
-        logger_co2_shortterm.add(now_timestamp, CO2) #........... Add new CO2 sample to the short-term logger
+            print_mem("after logger")
 
-        logger_pressure_24h.add(now_timestamp, pressure) #....... Add new pressure sample to the short-term logger
-        logger_temperature_24h.add(now_timestamp, temp) #........ Add new temperature sample to the 24h logger
-        logger_humidity_24h.add(now_timestamp, hum) #............ Add new humidity sample to the 24h logger
-        logger_co2_24h.add(now_timestamp, CO2) #................. Add new CO2 sample to the 24h logger
+            last_measurement = ticks_ms() #................ Start the next interval after reading and logging
 
-        print_mem("after logger")
+    #-- Apply one bounded batch of presses captured during any work -------
+        for _ in range(buttons.pending()):
+            button = buttons.pop()
+            SCR_LAYOUT_NUMBER = apply_button(
+                SCR_LAYOUT_NUMBER, button, SCR_MAX_LAYOUT_NUMBER + 1
+            )
+            SCR_FULL_REFRESH = True #...................... K1 also refreshes when the layout stays the same
+            print(f"K{button} button released: screen layout {SCR_LAYOUT_NUMBER}")
 
-    #-- Draw the first screen layout with the example data ----------------
+        if buttons.take_overflow():
+            print("Button queue full: new presses were discarded.")
+
+    #-- Wait briefly when neither measurements nor buttons need drawing ---
+        if not measurement_due and not SCR_FULL_REFRESH:
+            sleep_ms(10) #................................ Avoid busy polling while the timer samples inputs
+            continue
+
+    #-- Draw the selected layout with the latest sensor data --------------
         gc.collect() #..................................................... Run garbage collection to free up memory before the next loop iteration
         try:
             print(f"Drawing screen layout {SCR_LAYOUT_NUMBER} ...")
@@ -240,7 +269,7 @@ def main():
                                     logger_pressure_24h
                             )
             else:
-                raise ValueError(f"Invalid screen mode: {screen_mode}") #........ Raise an error if the screen mode is invalid (not 0 or 1)
+                raise ValueError(f"Invalid screen mode: {SCR_LAYOUT_NUMBER}") #........ Reject an invalid screen layout
         except MemoryError as e:
             print(f"MemoryError: {e}")
 
@@ -272,60 +301,6 @@ def main():
                 screen_writer.show()
 
         print_mem("after screen")
-
-    #-- Wait before the next update and check buttons ---------------------
-        WAIT_INTERVAL_MS = 30 * 1000 #.......................... Wait 30 seconds before the next loop iteration
-        start_wait       = ticks_ms() #......................... Current time in ms
-
-        while ticks_diff(ticks_ms(), start_wait) < WAIT_INTERVAL_MS:
-            DELAY_DEBOUNCE_MS = 0.20 #......................... Debounce delay to avoid multiple triggers from a single button press
-
-            if btn_K1.value() == 0: #.......................... Check if K1 button is pressed (active low)
-                print(
-                    "K1 button press detected during wait, "
-                    "refreshing screen immediately..."
-                )
-                SCR_FULL_REFRESH = True #...................... Flag to indicate if a full screen refresh is requested by button press
-                sleep(DELAY_DEBOUNCE_MS) #..................... Sleep for a short time to debounce the button press and avoid multiple triggers
-                break #........................................ Exit the waiting loop to update the screen immediately
-            
-            elif btn_K2.value() == 0: #........................ Check if K2 button is pressed (active low)
-                print(
-                    "K2 button press detected during wait, "
-                    "going to previous screen immediately..."
-                )
-                SCR_LAYOUT_NUMBER -= 1 #....................... Decrease screen layout number to go to the previous screen
-                if SCR_LAYOUT_NUMBER < 0:
-                    SCR_LAYOUT_NUMBER = SCR_MAX_LAYOUT_NUMBER # Ensure screen layout number does not go below 0
-                SCR_FULL_REFRESH = True #...................... Flag to indicate if a full screen refresh is requested by button press
-                sleep(DELAY_DEBOUNCE_MS) #..................... Sleep for a short time to debounce the button press and avoid multiple triggers
-                break #........................................ Exit the waiting loop to update the screen immediately
-            
-            elif btn_K3.value() == 0: #........................ Check if K3 button is pressed (active low)
-                print(
-                    "K3 button press detected during wait, "
-                    "going to next screen immediately..."
-                )
-                SCR_LAYOUT_NUMBER += 1 #....................... Increase screen layout number to go to the next screen
-                if SCR_LAYOUT_NUMBER > SCR_MAX_LAYOUT_NUMBER:
-                    SCR_LAYOUT_NUMBER = 0 #.................... Ensure screen layout number does not exceed maximum
-                SCR_FULL_REFRESH = True #...................... Flag to indicate if a full screen refresh is requested by button press
-                sleep(DELAY_DEBOUNCE_MS) #..................... Sleep for a short time to debounce the button press and avoid multiple triggers
-                break #........................................ Exit the waiting loop to update the screen immediately
-            
-            elif btn_K4.value() == 0: #........................ Check if K4 button is pressed (active low)
-                print(
-                    "K4 button press detected during wait, "
-                    "returning back to home screen..."
-                )
-                SCR_LAYOUT_NUMBER = 0 #........................ Set screen layout number to 0 (home screen)
-                SCR_FULL_REFRESH = True #...................... Flag to indicate if a full screen refresh is requested by button press
-                sleep(DELAY_DEBOUNCE_MS) #..................... Sleep for a short time to debounce the button press and avoid multiple triggers
-                break #........................................ Exit the waiting loop to update the screen immediately
-
-    #-- Print a separator for the next loop iteration ---------------------
-        print("Updating screen with new sensor readings...")
-        print("-" * 50)
 
 
 if __name__ == "__main__":
