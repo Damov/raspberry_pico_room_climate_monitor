@@ -4,12 +4,29 @@ A compact system based on the Raspberry Pi Pico designed for monitoring indoor c
 
 # Screenshots
 
-The following images illustrate the assembly of the system on a breadboard using jumper wires for all signal and power connections. The display is configured with a standard layout, presenting 15 minutes of historical data on the left side and three primary metrics on the right side: temperature, humidity, and CO₂ concentration. The on-screen buttons are currently not utilized; however, they are reserved for future functionality to allow switching between different display layouts.
+The following images illustrate the assembly of the system on a breadboard using jumper wires for all signal and power connections. The display is configured with a standard layout, presenting 15 minutes of historical data on the left side and three primary metrics on the right side: temperature, humidity, and CO₂ concentration. The four buttons select the home screen, previous layout, next layout, or a full refresh of the current view.
 
 <p align="center">
   <img src="images/assembly_01.jpeg" width="600" alt="Assembly of the system, picture 1">
   <img src="images/assembly_02.jpeg" width="600" alt="Assembly of the system, picture 2">
   <img src="images/assembly_03.png" width="600" alt="Assembly of the system, picture 3">
+</p>
+
+# New firmware design
+
+The front page presents the current CO₂ concentration on the left, using a semicircular scale with Good / Medium / Bad / Very Bad in its centre and the value in ppm below. A short arrow indicates whether the concentration is rising or falling. Changes of 5% or less show no arrow. On the right, horizontal lines separate temperature, relative humidity, and sea-level pressure. The thermometer and water-drop symbols identify the first two readings, while Low / Normal / High indicates the pressure conditions. The following previews use illustrative readings.
+
+<p align="center">
+  <img src="images/firmware_front.png" width="528" border="1" style="border: 1px solid black" alt="New firmware front page with CO₂ scale, trend arrow, temperature, humidity, and sea-level pressure">
+</p>
+
+The four 24-hour history pages display temperature, relative humidity, CO₂ concentration, and local atmospheric pressure. Each page presents a chart of 30-minute averages, followed by Current, Min, and Max in three aligned rows with their corresponding units. The time axis shows how many hours ago the measurements were recorded. The most recent values appear on the right. History is stored in RAM and starts again when the device is restarted.
+
+<p align="center">
+  <img src="images/firmware_temperature_24h.png" width="528" border="1" style="border: 1px solid black" alt="24-hour temperature history with Current, Min, and Max in degrees Celsius">
+  <img src="images/firmware_humidity_24h.png" width="528" border="1" style="border: 1px solid black" alt="24-hour relative humidity history with Current, Min, and Max in per cent">
+  <img src="images/firmware_co2_24h.png" width="528" border="1" style="border: 1px solid black" alt="24-hour CO₂ history with Current, Min, and Max in ppm">
+  <img src="images/firmware_pressure_24h.png" width="528" border="1" style="border: 1px solid black" alt="24-hour local pressure history with Current, Min, and Max in hPa">
 </p>
 
 # Features
@@ -82,12 +99,34 @@ The display is wired using a JST‑to‑Dupont cable (<b>PH2.0, 20 cm, 8‑pin
 * RST → GP12
 * BUSY → GP13
 
-To control the screen, four buttons (K1, K2, K3, K4) are used. Currently, five screen layouts are defined. The K1 button returns to screen 0 (the home screen), K2 switches to the previous screen layout, K3 advances to the next layout, and K4 refreshes the current view, as e‑Paper displays can sometimes show visual artifacts. The buttons share a common ground connection on the <b>Raspberry Pi Pico microcontroller</b>, with the <b>GP21</b> pin assigned to <b>K1</b>, <b>GP20</b> to <b>K2</b>, <b>GP19</b> to <b>K3</b>, and <b>GP18</b> to <b>K4</b> button:
+To control the screen, four buttons (K1, K2, K3, K4) are used. Currently, five screen layouts are defined. The K4 button returns to screen 0 (the home screen), K3 (Up) switches to the previous screen layout, K2 (Down) advances to the next layout, and K1 refreshes the current view, as e‑Paper displays can sometimes show visual artifacts. The buttons share a common ground connection on the <b>Raspberry Pi Pico microcontroller</b>, with the <b>GP21</b> pin assigned to <b>K1</b>, <b>GP20</b> to <b>K2</b>, <b>GP19</b> to <b>K3</b>, and <b>GP18</b> to <b>K4</b> button:
 
 * GND → K1 → GP21
 * GND → K2 → GP20
 * GND → K3 → GP19
 * GND → K4 → GP18
+
+Holding a button does nothing. Each completed press triggers one action only after the button is released. Both pressing and releasing must remain stable for 40 ms; very brief taps or glitches are ignored. Navigation wraps between layouts 0 and 4. Buttons held during startup must be released before they can trigger an action; that initial release does not trigger an action.
+
+Buttons are sampled every 10 ms independently of sensor reads and e-paper refreshes. Completed clicks released while the display is busy are queued and applied in order once it is ready; the resulting layout is refreshed once per batch using the latest sensor data. Simultaneous releases are processed in K1, K2, K3, K4 order. The queue holds 32 presses; if it fills, additional presses are discarded and an overflow message is printed. Button actions do not trigger extra sensor reads or restart the 30-second measurement interval. Queued clicks take priority over a due measurement when cached readings are available; the measurement resumes once the pending clicks have been handled.
+
+To reduce navigation delay, the driver uses 20 ms reset and post-busy settling waits, matching Waveshare's C driver, and sends landscape pixels in 22-byte SPI batches using a reusable row buffer. The driver still waits for BUSY to indicate readiness and retains full cleaning refreshes for navigation.
+
+The start screen shows a monochrome CO2 gauge on the left, with Good / Medium / Bad / Very Bad in its centre and the current ppm value below. The eight-pixel-wide scale spans 400–2500 ppm and fills black from 400 ppm up to the current reading. The band and its fill have rounded ends. The remaining portion stays white with a two-pixel black outline; small gaps separate the four assessment sectors. At or below 400 ppm the scale is empty; at or above 2500 ppm it is full. Values outside that range keep their actual numeric reading. A leaf appears beside CO2; larger thermometer and water-drop icons sit before the temperature and humidity values on the right. The bottom row displays sea-level pressure in hPa and Low / Normal / High, without a pressure heading or icon. Pressure logs and the 24-hour pressure page retain local sensor readings.
+
+A short, thick arrow below the CO2 assessment shows the change from the previous sensor reading (normally 30 seconds earlier). It points up or down only when the change exceeds `CO2_TREND_THRESHOLD_PERCENT = 5.0` in `src/main.py`, measured relative to the previous reading. Changes within the threshold, including exactly ±5%, show no arrow. Change this parameter to adjust sensitivity (for example, `2.0` hides changes of 2% or less); transfer the updated `main.py` and restart the Pico. The first reading and nonpositive readings show no arrow. Navigation and manual refreshes retain the cached trend without triggering extra measurements. Use `--trend up` or `--trend down` with the start-screen preview command to inspect the arrows.
+
+Set `ALTITUDE_M = 50.0` near the top of `src/main.py` to the device height in metres above sea level. Transfer the updated file as `main.py` and restart the Pico after changing it. The start screen approximates sea-level pressure as `p_local / (1 - ALTITUDE_M / 44330.0) ** 5.255`. Low means below 1000 hPa, Normal means 1000 through 1020 hPa, and High means above 1020 hPa; these are broad orientation thresholds, not a weather forecast.
+
+For a pixel-exact host preview using the bundled fonts, install Pillow and run `python3 tools/preview_start_screen.py --co2 2000 --output /tmp/climate-start-screen.png`. The preview does not access the device.
+
+All four 24-hour history pages show Current, Min, and Max in three stacked rows. Labels are left-aligned in one column; each complete value-and-unit pair is left-aligned in the next column, with its unit directly after the number on the same line. Min and Max include the current reading; an empty history shows n/a. The chart redraws with each 30-second measurement using 30-minute bin averages, including the active bin. A nonempty active bin is visible immediately, even when its elapsed time is less than one pixel on the 24-hour scale. History is held in RAM and starts over after a device restart or firmware upload; it is not persisted.
+
+To preview all history layouts with representative data, run `python3 tools/preview_history.py`; add `--empty` for empty history or `--output /tmp/history.png` to choose the output file. Pillow is required only for rendering previews, not for the unit tests.
+
+Full page refreshes reinitialize the display controller, restore the complete RAM write window, and populate both image RAM planes. Partial updates use the reference driver's reset and border configuration and synchronize the reference image after completing the refresh. Normal updates follow the 30-second measurement cadence; after five soft updates, the next update performs a cleaning full refresh (approximately every three minutes). Only one refresh mode runs per cycle. Manual full refreshes restart the cleaning count and refresh timers. Automatic five-minute fast updates are removed; the fast-refresh API remains available and initializes its waveform before use. If drawing runs out of memory, the page is retried without refreshing an incomplete frame; three consecutive failures use the existing error handler.
+
+**Firmware requirement:** MicroPython **1.27 or newer** for the Pico 2 (RP2 port), with hard interrupt timer support. Older firmware must be upgraded before running this version. Upload the new `button_controller.py` file together with `main.py` and the other files in `src/`.
 
 ## Firmware installation
 
@@ -161,6 +200,17 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 * <a href="https://github.com/peterhinch"><b>Peter Hinch</b></a>: For the writer class used for text rendering and font_to_py for fonts.
 * <a href="https://github.com/waveshareteam/Pico_ePaper_Code"><b>Waveshare</b></a>: For the ePaper display and driver.
 display 
+
+## Button regression tests
+
+Run the simulated button and main-loop tests on a computer from the repository root:
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+On the Pico, verify K4 Home, K3 Up/Previous, K2 Down/Next, and K1 Refresh; hold each button to check that nothing happens until release, then confirm that it triggers once. Press Next twice during a full refresh and confirm that the resulting page advances twice. These hardware checks also verify timer operation with the installed firmware and the actual button contacts.
+
 
 # Disclaimer
 <b>This project and all associated files, documentation, and source code are provided “as is” without any express or implied warranties, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, and non‑infringement. The author and contributors of this repository assume no responsibility or liability for any direct, indirect, incidental, or consequential damages that may occur through the use, modification, or distribution of the software and hardware designs contained herein. This includes, but is not limited to, hardware damage, data loss, malfunctioning devices, or personal injury that may arise from incorrect wiring, improper configuration, or misuse of the provided code and documentation. Users are encouraged to review, test, and verify all code before deploying it on any system. If you choose to use this project, you do so entirely at your own risk. By downloading, copying, modifying, or using any part of this project, you acknowledge that you have read, understood, and agree to this disclaimer.</b>

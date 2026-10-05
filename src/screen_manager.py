@@ -11,6 +11,7 @@ See: https://github.com/Damov/raspberry_pico_room_climate_monitor
 """
 
 import machine
+import math
 from drivers.screen_waveshare_2p7inch_module import EPD_2in7_V2
 from screen_writer import ScreenWriter
 
@@ -21,9 +22,11 @@ class ScreenManager:
         Draws the screen with actual data onto the e-ink display. It
         manages the different screen layouts and their updates.
     """
-    def __init__(self, screen_writer):
+    def __init__(self, screen_writer, altitude_m=0.0):
     #-- Save attributes -----------------------------------------------
         self.screen_writer = screen_writer
+        self.altitude_m = altitude_m #........................ Height above sea level in metres
+        self._pressure_factor = (1 - altitude_m / 44330.0) ** -5.255
     
     #-- Return --------------------------------------------------------
         return
@@ -36,10 +39,12 @@ class ScreenManager:
             CO2,
             logger_temperature_shortterm,
             logger_humidity_shortterm,
-            logger_co2_shortterm
+            logger_co2_shortterm,
+            co2_trend_direction=0
         ):
         """
-            Draws the first screen layout with the given data.
+            Draws the CO2 gauge and climate readings on the start screen.
+            Short-term logger arguments are retained for caller compatibility.
 
             Arguments:
             ----------
@@ -53,170 +58,172 @@ class ScreenManager:
                     CO2 concentration in ppm
                 logger_temperature_shortterm: Logger
                     Logger instance to retrieve historical data 
-                    for the pressure
+                    for the temperature (unused on this layout)
                 logger_humidity_shortterm: Logger
                     Logger instance to retrieve historical data 
-                    for the humidity
+                    for the humidity (unused on this layout)
                 logger_co2_shortterm: Logger
                     Logger instance to retrieve historical data 
-                    for the CO2
+                    for the CO2 (unused on this layout)
             
             Returns:
             --------
                 None
                    This function draws the screen and does not return any value.
         """
-    #-- Set Font ------------------------------------------------------
-        self.screen_writer.change_font(OpenSansBold_28)  #............ Change the font back to the default for the next screen
+    #-- Draw the new start screen on a white background ----------------
+        self.screen_writer.clear_fb(color=0xFF)
+        fb = self.screen_writer.fb
+        fb.vline(136, 8, 160, 0x00) #........................ Separate CO2 from the climate readings
+        fb.line(136, 57, 263, 57, 0x00) #................... Separate temperature from humidity
+        fb.line(136, 111, 263, 111, 0x00) #................. Separate humidity from pressure
 
-    #-- Clear frame buffer with white color ---------------------------
-        self.screen_writer.clear_fb(color=0x00)
+    #-- Draw CO2 scale, assessment, and current value -------------------
+        self._draw_co2_gauge(CO2)
+        self._draw_co2_trend_arrow(co2_trend_direction)
 
-    #-- Load screen 1 background --------------------------------------
-        fname = "img/static_screen1_background.bin"
-        img_width  = 264
-        img_height = 176
-
-        self.screen_writer.add_image(
-                            fname,
-                            img_width,
-                            img_height,
-                            x=0,
-                            y=0,
-                            do_gc = True,
-                            invert_colors = False,
-                            show_after = False
-            )
-    
-    #-- Add temperature -----------------------------------------------
-        self.screen_writer.add_text(
-                text = f"{temp:2.1f} °C",
-                x = 145,
-                y = 15,
-                invert = True
-            )
-
-    #-- Add humidity --------------------------------------------------
-        self.screen_writer.add_text(
-                text = f"{hum:2.1f} %",
-                x = 145,
-                y = 70,
-                invert = True
-            )
-
-    #-- Add CO2 --------------------------------------------------------
-        self.screen_writer.add_text(
-                text = f"{CO2:4.0f} ppm",
-                x = 145,
-                y = 120,
-                invert = True
-            )
-        
-    #-- Add assesment of air quaility ---------------------------------
-        """
-            - green (good): 400–800 ppm
-            - yellow (medium): 800–1200 ppm
-            - orange (bad): 1200–2000 ppm
-            - red (very bad/alarm): >2000 ppm
-        """
-        self.screen_writer.change_font(OpenSansBold_20)
-        if CO2 < 800:
-            text = "Good"
-        elif CO2 < 1200:
-            text = "Medium"
-        elif CO2 < 2000:
-            text = "Bad"
-        else:
-            text = "Very Bad"
-        
-        self.screen_writer.add_text(
-                text = text,
-                x = 145,
-                y = 150,
-                invert = True
-            )
-        self.screen_writer.change_font(OpenSansBold_28) #............ Change the font back to the default for the next screen
-
-    #-- Add barplot of historical temperature data --------------------
-        x_min = 0
-        y_min = 0
-        x_max = 0.25 * 3600
-        y_max = 40
-
-        x_scr_min = 5
-        y_scr_min = 5
-        x_scr_max = 120
-        y_scr_max = 53
-
-        samples = logger_temperature_shortterm.bin_series()
-
-        self.draw_barplot(
-                x_scr_min,
-                y_scr_min,
-                x_scr_max,
-                y_scr_max,
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-                samples,
-                color=0x00
-            )
-        
-    #-- Add barplot of historical humidity data --------------------
-        x_min = 0
-        y_min = 20
-        x_max = 0.25 * 3600
-        y_max = 100
-
-        x_scr_min = 5
-        y_scr_min = 60
-        x_scr_max = 120
-        y_scr_max = 108
-
-        samples = logger_humidity_shortterm.bin_series()
-
-        self.draw_barplot(
-                x_scr_min,
-                y_scr_min,
-                x_scr_max,
-                y_scr_max,
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-                samples,
-                color=0x00
-            )
-
-    #-- Add barplot of historical CO2 data -------------------------
-        x_min = 0
-        y_min = 400
-        x_max = 0.25 * 3600
-        y_max = 2500
-
-        x_scr_min = 5
-        y_scr_min = 118
-        x_scr_max = 120
-        y_scr_max = 166
-
-        samples = logger_co2_shortterm.bin_series()
-
-        self.draw_barplot(
-                x_scr_min,
-                y_scr_min,
-                x_scr_max,
-                y_scr_max,
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-                samples,
-                color=0x00
-            )
-
-    #-- Return --------------------------------------------------------
+    #-- Place larger climate symbols beside their values ---------------
+        self.screen_writer.add_image("img/thermometer.bin", 16, 32, x=143, y=12,
+                                     invert_colors=False, show_after=False)
+        self._start_text(f"{temp:2.1f} °C", 168, 260, 14, center_y=28)
+        self.screen_writer.add_image("img/water-drop.bin", 22, 32, x=140, y=66,
+                                     invert_colors=False, show_after=False)
+        self._start_text(f"{hum:2.1f} %", 168, 260, 68, center_y=82)
+    #-- Show pressure and status without a heading or symbol ------------
+        sea_pressure = self._sea_level_pressure(pressure)
+        self._start_text(f"{sea_pressure:.1f} hPa", 145, 260, 122,
+                         (OpenSansBold_20, OpenSansBold_12))
+        self._start_text(self._pressure_status(sea_pressure), 145, 260, 148,
+                         (OpenSansBold_20, OpenSansBold_12))
+        self.screen_writer.change_font(OpenSansBold_28) #.... Restore the default font for other pages
         return
+
+    def _start_text(self, text, x_start, x_end, y, fonts=None, center_y=None):
+        """Center one line in its column, selecting a font that fits."""
+        if fonts is None:
+            fonts = (OpenSansBold_28, OpenSansBold_20, OpenSansBold_12)
+        for font in fonts:
+            self.screen_writer.change_font(font)
+            if self.screen_writer.writer.stringlen(text) <= x_end - x_start:
+                if center_y is not None:
+                    y = center_y - font.height() // 2 #..... Keep smaller fallback fonts aligned with the icon
+                self.screen_writer.add_text_horizontal_center(
+                    text, y, x_start=x_start, x_end=x_end, invert=True)
+                return
+        raise ValueError("Start-screen text exceeds its column: " + text)
+
+    def _sea_level_pressure(self, pressure):
+        """Approximate sea-level pressure using the standard atmosphere."""
+        return pressure * self._pressure_factor
+
+    @staticmethod
+    def _pressure_status(pressure):
+        """Use broad display thresholds, rather than a weather forecast."""
+        if pressure < 1000:
+            return "Low"
+        if pressure > 1020:
+            return "High"
+        return "Normal"
+
+    @staticmethod
+    def _co2_status(co2):
+        """Preserve the existing CO2 assessment thresholds."""
+        if co2 < 800:
+            return "Good"
+        if co2 < 1200:
+            return "Medium"
+        if co2 < 2000:
+            return "Bad"
+        return "Very Bad"
+
+    @staticmethod
+    def _co2_angle(co2):
+        """Map 400..2500 ppm onto a 270-degree arc, clamping the fill level."""
+        return (135 + 270 * (min(2500, max(400, co2)) - 400) / 2100) * math.pi / 180
+
+    def _draw_co2_gauge(self, co2):
+        """Draw an eight-pixel ring filled up to the current CO2 value."""
+        fb = self.screen_writer.fb
+        cx, cy = 67, 82
+        self.screen_writer.change_font(OpenSansBold_20)
+        heading_width = self.screen_writer.writer.stringlen("CO2")
+        heading_x = (135 - heading_width - 5 - 18) // 2 #.... Center the CO2 heading and leaf as one group
+        self.screen_writer.add_text("CO2", heading_x, 5, invert=True)
+        self.screen_writer.add_image("img/leaf.bin", 18, 18,
+                                     x=heading_x + heading_width + 5, y=6,
+                                     invert_colors=False, show_after=False)
+
+    #-- Fill four separated sectors without an extra image buffer ------
+        boundaries = (400, 800, 1200, 2000, 2500)
+        angles = tuple(self._co2_angle(value) for value in boundaries)
+        fill_angle = self._co2_angle(co2)
+        sectors = []
+        for sector in range(4):
+            start = angles[sector] + 0.105 #................ Inset cap centres to preserve the gaps
+            end = angles[sector + 1] - 0.105
+            filled_end = min(end, max(start, fill_angle))
+            sectors.append((start, end, filled_end,
+                            (50 * math.cos(start), 50 * math.sin(start)),
+                            (50 * math.cos(end), 50 * math.sin(end)),
+                            (50 * math.cos(filled_end), 50 * math.sin(filled_end)),
+                            co2 > boundaries[sector]))
+        for dy in range(-53, 54):
+            for dx in range(-53, 54):
+                distance = dx * dx + dy * dy
+                if distance < 46 * 46 or distance >= 54 * 54:
+                    continue
+                angle = math.atan2(dy, dx)
+                if angle < angles[0]:
+                    angle += 2 * math.pi
+                radial_distance = (math.sqrt(distance) - 50) ** 2
+                for start, end, filled_end, first, last, filled_last, active in sectors:
+                    if angle < start - 0.08 or angle > end + 0.08:
+                        continue
+                    track_distance = self._arc_distance_sq(
+                        dx, dy, angle, start, end, first, last, radial_distance)
+                    if track_distance >= 16:
+                        continue
+                    outline = track_distance >= 4 #........ Two-pixel contour around the rounded band
+                    filled = active and self._arc_distance_sq(
+                        dx, dy, angle, start, filled_end, first, filled_last,
+                        radial_distance) < 16
+                    fb.pixel(cx + dx, cy + dy, 0x00 if outline or filled else 0xFF)
+                    break
+
+    #-- Keep the assessment inside the arc and ppm beneath it -----------
+        self._start_text(self._co2_status(co2), 22, 112, 71,
+                         (OpenSansBold_20, OpenSansBold_12))
+        self._start_text("400", 9, 41, 120, (OpenSansBold_12,))
+        self._start_text("2500", 91, 130, 120, (OpenSansBold_12,))
+        self._start_text(f"{co2:.0f}", 5, 130, 133)
+        self._start_text("ppm", 5, 130, 163, (OpenSansBold_12,))
+        return
+
+    def _draw_co2_trend_arrow(self, direction):
+        """Draw a short solid arrow below the assessment, or nothing if stable."""
+        if direction == 0:
+            return
+        fb = self.screen_writer.fb
+        if direction > 0:
+            for row in range(10):
+                fb.hline(67 - row, 100 + row, 2 * row + 1, 0x00)
+            stem_y = 109
+        else:
+            for row in range(10):
+                half_width = 9 - row
+                fb.hline(67 - half_width, 108 + row, 2 * half_width + 1, 0x00)
+            stem_y = 100
+        for row in range(9):
+            fb.hline(64, stem_y + row, 6, 0x00) #............ Thick stem, drawn without an extra image asset
+
+    @staticmethod
+    def _arc_distance_sq(dx, dy, angle, start, end, first, last, radial_distance):
+        """Distance to an arc centreline, including circular end caps."""
+        if angle < start:
+            return (dx - first[0]) ** 2 + (dy - first[1]) ** 2
+        if angle > end:
+            return (dx - last[0]) ** 2 + (dy - last[1]) ** 2
+        return radial_distance
 
 
     def screen2_24h_temperature_history(
@@ -525,37 +532,28 @@ class ScreenManager:
 
         self.screen_writer.change_font(OpenSansBold_20)  #.... Change the font back to the default for the next screen
 
-    #-- Add information -----------------------------------------------
-        self.screen_writer.add_text(
-                text = f"Current: {current_value:2.1f} {unit}",
-                x = 10,
-                y = 110,
-                invert = True
-            )
-        
+    #-- Stack Current, Min, and Max with one aligned value column -------
         if logger.count() > 0:
-        #-- Get the minimal and maximal value -------------------------
-            value_min = logger.min()
-            value_max = logger.max()
-        #-- Corect by the current value -------------------------------
-            if current_value < value_min:
-                value_min = current_value
-            if current_value > value_max:
-                value_max = current_value
-        #-- Plot text -------------------------------------------------
-            self.screen_writer.add_text(
-                    text = f"Min/Max: {value_min:2.1f} / {value_max:2.1f} {unit}",
-                    x = 10,
-                    y = 140,
-                    invert = True
-                )
+            values = (current_value, min(logger.min(), current_value),
+                      max(logger.max(), current_value))
         else:
-            self.screen_writer.add_text(
-                    text = f"Min/Max: n/a {unit}",
-                    x = 10,
-                    y = 140,
-                    invert = True
-                )
+            values = (current_value, None, None)
+        texts = tuple(f"{value:.1f} {unit}" if value is not None else f"n/a {unit}" for value in values)
+        rows = (108, 130, 152)
+        value_font = OpenSansBold_20
+        self.screen_writer.change_font(value_font)
+        if any(self.screen_writer.writer.stringlen(text) > 154 for text in texts):
+            value_font = OpenSansBold_12 #.................. Use one common size for the aligned value rows
+        for heading, text, y in zip(("Current", "Min", "Max"), texts, rows):
+            self.screen_writer.change_font(OpenSansBold_20)
+            self.screen_writer.add_text(heading, 10, y, invert=True)
+            self.screen_writer.change_font(value_font)
+            width = self.screen_writer.writer.stringlen(text)
+            if width > 154:
+                raise ValueError("History value exceeds its column: " + text)
+            value_y = y + (OpenSansBold_20.height() - value_font.height()) // 2
+            self.screen_writer.add_text(text, 100, value_y, invert=True)
+        self.screen_writer.change_font(OpenSansBold_20)
 
     #-- Return --------------------------------------------------------
         return
@@ -572,13 +570,14 @@ class ScreenManager:
         """
         Draw a barplot in screen coords (x_scr_min/y_scr_min) - (x_scr_max/y_scr_max),
         where x/y are linearly mapped from logical ranges [x_min,x_max] and
-        [y_min,y_max]. Samples is list of (x_value, y_value). Bars are stretched
-        accordingly and separated by a 1px white line. Values outside the
+        [y_min,y_max]. Samples is an oldest-first list of (age_seconds, y_value). Each bin
+        extends toward its next newer bin, with the active bin ending at Now.
+        Subpixel bins remain visible and separators never erase narrow bars. Values outside the
         [y_min,y_max] logical range are cropped to the physical box.
         """
         fb = self.screen_writer.fb #...................................... Get the frame buffer from the screen writer
-        #samples = samples[::-1] #........................................ Reverse the samples to have the most recent one at the end of the list
-
+        plot_left, plot_right = x_scr_min + 1, x_scr_max - 1
+        plot_top, plot_bottom = y_scr_min + 1, y_scr_max - 1
 
     #-- Invert bar along x-axis ----------------------------------------------
         x_min = -x_max
@@ -589,29 +588,28 @@ class ScreenManager:
         def _map_x_value(x_value):
             # Map logical x value to screen x coordinate
             if x_value < x_min:
-                return x_scr_min
+                return plot_left
             elif x_value > x_max:
-                return x_scr_max
+                return plot_right
             else:
-                return int(x_scr_min + (x_value - x_min) / (x_max - x_min) * (x_scr_max - x_scr_min))
+                return int(plot_left + (x_value - x_min) / (x_max - x_min) * (plot_right - plot_left))
             
         def _map_y_value(y_value):
             # Map logical y value to screen y coordinate (inverted)
             if y_value < y_min:
-                return y_scr_max
+                return plot_bottom
             elif y_value > y_max:
-                return y_scr_min
+                return plot_top
             else:
-                return int(y_scr_max - (y_value - y_min) / (y_max - y_min) * (y_scr_max - y_scr_min))
+                return int(plot_bottom - (y_value - y_min) / (y_max - y_min) * (plot_bottom - plot_top))
             
     #-- Iterate over samples and plot bars -------------------------------------------------------------
         for k in range(len(samples)):
         #-- Select physical x values for the left and right edge of the bar ----------------------------
-            if k < 1:
-                x_value_left = 0 #................. For the first bar, we can set the left edge to the start of the x range
-            else:
-                x_value_left = samples[k-1][0] #... Phsyical x value in seconds ago for the left edge of the bar (previous sample)
-            x_value_right = samples[k][0] #........ Phsyical x value in seconds ago for the right edge of the bar (current sample)
+            x_value_left = samples[k][0] #................... Older edge of this bin
+            x_value_right = samples[k + 1][0] if k + 1 < len(samples) else 0
+            if x_value_right <= x_min or x_value_left > x_max:
+                continue #.................................. Skip intervals entirely outside the history window
 
         #-- Select physical y value of the bar ---------------------------------------------------------
             y_value = samples[k][1] #.............. Physical y value in the given units for the current sample
@@ -621,26 +619,32 @@ class ScreenManager:
             x_bar_right  = _map_x_value(x_value_right) #. Map logical x to screen x for the left edge of the bar
             y_bar        = _map_y_value(y_value) #....... Map logical y to screen y for the top of the bar (inverted because screen y increases downwards)
 
+            if x_bar_right <= x_bar_left:
+                x_bar_left = max(plot_left, min(x_bar_left, plot_right - 1))
+                x_bar_right = x_bar_left + 1 #............... Keep a nonempty subpixel bin visible
+            if y_bar >= plot_bottom:
+                continue
+
         #-- Draw filled bar as a rectangle -------------------------------------------------------------
             fb.rect(
                 x_bar_left,
                 y_bar,
                 x_bar_right-x_bar_left,
-                y_scr_max - y_bar,
+                plot_bottom - y_bar,
                 color,
                 True
             )
         
-        #-- Plot white vertical bars to separate the bars ------------------------------------------------
-            fb.vline(x_bar_right, y_scr_min, y_scr_max, 0xFF)
-            fb.vline(x_bar_left, y_scr_min, y_scr_max, 0xFF)
+        #-- Separate bins without erasing a one-pixel bar ---------------------
+            if x_bar_right - x_bar_left > 1:
+                fb.vline(x_bar_left, plot_top, plot_bottom - plot_top, 0xFF)
 
-    #-- Plot 5 bars ---------------------------------------------------
+    #-- Keep horizontal grid lines inside the plot frame --------------------
         N = 5
-        dY = (y_scr_max - y_scr_min) / N
-        for i in range(N + 1):
-            y = int(y_scr_min + i * dY)
-            fb.hline(x_scr_min, y, x_scr_max - x_scr_min + 1, 0xFF)
+        dY = (plot_bottom - plot_top) / N
+        for i in range(1, N):
+            y = int(plot_top + i * dY)
+            fb.hline(plot_left, y, plot_right - plot_left, 0xFF)
 
     #-- Return -----------------------------------------------------------------------------------------
         return
