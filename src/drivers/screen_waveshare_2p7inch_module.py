@@ -33,6 +33,7 @@
 # 2026-02-22 : added method display_Landscape_Fast()
 # 2026-02-22 : added method display_Landscape_Partial()
 # 2026-10-05 : restore controller state and RAM addresses for page updates
+# 2026-10-05 : maintain both image RAM planes across full and soft updates
 # =============================================================================
 
 from machine import Pin, SPI
@@ -325,9 +326,9 @@ class EPD_2in7_V2:
         self.send_data1(image)
         self.TurnOnDisplay()
         
-    def _write_landscape(self, image):
+    def _write_landscape(self, image, ram_command=0x24):
         """
-            Write a landscape frame from the beginning of the display RAM.
+            Write a landscape frame to either image RAM plane (0x24 or 0x26).
 
             Restore the full write window and both address counters before
             every transfer, including after switching refresh modes.
@@ -355,7 +356,7 @@ class EPD_2in7_V2:
         self.send_data(0x00)
 
     #-- Transfer the frame using the existing landscape orientation -------
-        self.send_command(0x24)
+        self.send_command(ram_command)
         for j in range(Height):
             for i in range(Width):
                 self.send_data(image[(Width - 1 - i) * Height + j])
@@ -363,16 +364,26 @@ class EPD_2in7_V2:
     def display_Landscape(self, image):
     #-- Restore full-refresh mode before sending a new page ---------------
         self.init() #..................................... Clear controller state left by partial or fast updates
-        self._write_landscape(image)
+        self._write_landscape(image, 0x24)
+        self._write_landscape(image, 0x26) #................ Restore the reference image after full initialization
         self.TurnOnDisplay()
 
     def display_Landscape_Fast(self, image):
-        self._write_landscape(image)
+    #-- Initialize the fast waveform before activating it -----------------
+        self.init_Fast()
+        self._write_landscape(image, 0x24)
         self.TurnOnDisplay_Fast()
+        self._write_landscape(image, 0x26) #................ Keep the reference image equal to the completed frame
 
     def display_Landscape_Partial(self, image):
-        self._write_landscape(image)
+    #-- Follow the reference driver's partial-refresh configuration -------
+        self.reset() #.................................... Hardware reset without the full software initialization
+        self.ReadBusy()
+        self.send_command(0x3C) #......................... Configure the border waveform for partial refresh
+        self.send_data(0x80)
+        self._write_landscape(image, 0x24)
         self.TurnOnDisplay_Partial()
+        self._write_landscape(image, 0x26) #................ Update the baseline only after the refresh has completed
 
     def display_Fast(self, image):
         if(self.width % 8 == 0):
