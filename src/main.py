@@ -45,6 +45,33 @@ def print_mem(label=""):
     ) #................................................................. Print the label along with free and allocated memory in bytes for debugging purposes
 
 
+def refresh_screen(screen_writer, refresh_state, force_full=False, measurement_due=False):
+    """
+        Select one refresh and update scheduling state only after success.
+
+        Full refreshes clean ghosting after five soft updates or 15 minutes.
+        Normal partial updates follow the 30-second measurement cadence.
+        Manual full refreshes restart both timers and the soft-update count.
+    """
+    now = ticks_ms()
+    if (force_full or refresh_state["soft_updates"] >= 5 or
+            ticks_diff(now, refresh_state["last_full"]) >= 15 * 60 * 1000):
+        screen_writer.show()
+        completed = ticks_ms()
+        refresh_state["last_full"] = completed
+        refresh_state["last_partial"] = completed
+        refresh_state["soft_updates"] = 0
+        print("Screen refresh: full; soft-update count reset")
+        return "full"
+    elif measurement_due: #.............................. Refresh each newly measured frame without adding a second interval
+        screen_writer.show_partial()
+        refresh_state["last_partial"] = ticks_ms()
+        refresh_state["soft_updates"] += 1
+        print(f"Screen refresh: partial {refresh_state['soft_updates']}/5")
+        return "partial"
+    return None #.......................................... No refresh is due yet
+
+
 def main():
     """Initialize button sampling and always stop it when the application exits."""
 #-- Define active-low K1, K2, K3, K4 inputs ----------------------------
@@ -73,9 +100,11 @@ def _run_monitor(buttons):
     last_measurement      = None #................................... Read sensors before drawing the first page
 
 #-- Set time refresh intervals to current time ------------------------
-    last_full = ticks_ms()
-    last_fast = ticks_ms()
-    last_partial = ticks_ms()
+    refresh_state = {
+        "last_full": ticks_ms(),
+        "last_partial": ticks_ms(),
+        "soft_updates": 0
+    }
     first_refresh = True
 
 #-- Initialize the short-term Logger ----------------------------------
@@ -282,32 +311,14 @@ def _run_monitor(buttons):
             continue #.................................... Never refresh an incomplete frame after drawing fails
         draw_failures = 0
 
-    #-- Update screen -----------------------------------------------------
-        if first_refresh or SCR_FULL_REFRESH:
-            screen_writer.show() #......................... First full refresh
-            first_refresh = False
-            SCR_FULL_REFRESH = False
-        else:
-            FULL_INTERVAL_MS    = 15 * 60 * 1000   # 15 min
-            FAST_INTERVAL_MS    = 5  * 60 * 1000   # 5 min
-            PARTIAL_INTERVAL_MS = 5  * 1000        # 5 s
-
-            now = ticks_ms() #................ Current time in ms
-
-            # 1) Every 5 s: partial refresh
-            if ticks_diff(now, last_partial) >= PARTIAL_INTERVAL_MS:
-                last_partial = now
-                screen_writer.show_partial()
-
-            # 2) Every 5 min: fast refresh
-            if ticks_diff(now, last_fast) >= FAST_INTERVAL_MS:
-                last_fast = now
-                screen_writer.show_fast()
-
-            # 3) Every 15 min: full refresh
-            if ticks_diff(now, last_full) >= FULL_INTERVAL_MS:
-                last_full = now
-                screen_writer.show()
+    #-- Select one refresh and commit its state only after success --------
+        refresh_screen(
+            screen_writer, refresh_state,
+            force_full=first_refresh or SCR_FULL_REFRESH,
+            measurement_due=measurement_due
+        )
+        first_refresh = False
+        SCR_FULL_REFRESH = False
 
         print_mem("after screen")
 
