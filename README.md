@@ -12,6 +12,23 @@ The following images illustrate the assembly of the system on a breadboard using
   <img src="images/assembly_03.png" width="600" alt="Assembly of the system, picture 3">
 </p>
 
+# New firmware design
+
+The front page presents the current CO₂ concentration on the left, using a semicircular scale with Good / Medium / Bad / Very Bad in its centre and the value in ppm below. A short arrow indicates whether the concentration is rising or falling. Changes of 5% or less show no arrow. On the right, horizontal lines separate temperature, relative humidity, and sea-level pressure. The thermometer and water-drop symbols identify the first two readings, while Low / Normal / High indicates the pressure conditions. The following previews use illustrative readings.
+
+<p align="center">
+  <img src="images/firmware_front.png" width="528" border="1" style="border: 1px solid black" alt="New firmware front page with CO₂ scale, trend arrow, temperature, humidity, and sea-level pressure">
+</p>
+
+The four 24-hour history pages display temperature, relative humidity, CO₂ concentration, and local atmospheric pressure. Each page presents a chart of 30-minute averages, followed by Current, Min, and Max in three aligned rows with their corresponding units. The time axis shows how many hours ago the measurements were recorded. The most recent values appear on the right. History is stored in RAM and starts again when the device is restarted.
+
+<p align="center">
+  <img src="images/firmware_temperature_24h.png" width="528" border="1" style="border: 1px solid black" alt="24-hour temperature history with Current, Min, and Max in degrees Celsius">
+  <img src="images/firmware_humidity_24h.png" width="528" border="1" style="border: 1px solid black" alt="24-hour relative humidity history with Current, Min, and Max in per cent">
+  <img src="images/firmware_co2_24h.png" width="528" border="1" style="border: 1px solid black" alt="24-hour CO₂ history with Current, Min, and Max in ppm">
+  <img src="images/firmware_pressure_24h.png" width="528" border="1" style="border: 1px solid black" alt="24-hour local pressure history with Current, Min, and Max in hPa">
+</p>
+
 # Features
 Shows current
 
