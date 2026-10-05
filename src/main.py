@@ -28,6 +28,10 @@ from fonts import OpenSansBold_28, OpenSansBold_20
 
 from error_handling import show_exception_on_screen, write_exception_to_file
 
+#-- Site configuration ------------------------------------------------
+ALTITUDE_M = 50.0 #........................................ Device height above sea level in metres; used by the start-screen pressure display
+
+
 def print_mem(label=""):
     """
         Print the current memory usage (free and allocated) 
@@ -194,7 +198,7 @@ def _run_monitor(buttons):
     screen_writer.show() #.......... Show the splash screen with the loading message
 
 #-- Create a ScreenManager instance -----------------------------------
-    screen_manager = ScreenManager(screen_writer)
+    screen_manager = ScreenManager(screen_writer, altitude_m=ALTITUDE_M)
 
 #-- Init sensors ------------------------------------------------------
     sensor_bme280 = BME280(

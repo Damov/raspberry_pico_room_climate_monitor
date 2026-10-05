@@ -11,6 +11,7 @@ See: https://github.com/Damov/raspberry_pico_room_climate_monitor
 """
 
 import machine
+import math
 from drivers.screen_waveshare_2p7inch_module import EPD_2in7_V2
 from screen_writer import ScreenWriter
 
@@ -21,9 +22,11 @@ class ScreenManager:
         Draws the screen with actual data onto the e-ink display. It
         manages the different screen layouts and their updates.
     """
-    def __init__(self, screen_writer):
+    def __init__(self, screen_writer, altitude_m=0.0):
     #-- Save attributes -----------------------------------------------
         self.screen_writer = screen_writer
+        self.altitude_m = altitude_m #........................ Height above sea level in metres
+        self._pressure_factor = (1 - altitude_m / 44330.0) ** -5.255
     
     #-- Return --------------------------------------------------------
         return
@@ -39,7 +42,8 @@ class ScreenManager:
             logger_co2_shortterm
         ):
         """
-            Draws the first screen layout with the given data.
+            Draws the CO2 gauge and climate readings on the start screen.
+            Short-term logger arguments are retained for caller compatibility.
 
             Arguments:
             ----------
@@ -53,174 +57,146 @@ class ScreenManager:
                     CO2 concentration in ppm
                 logger_temperature_shortterm: Logger
                     Logger instance to retrieve historical data 
-                    for the pressure
+                    for the temperature (unused on this layout)
                 logger_humidity_shortterm: Logger
                     Logger instance to retrieve historical data 
-                    for the humidity
+                    for the humidity (unused on this layout)
                 logger_co2_shortterm: Logger
                     Logger instance to retrieve historical data 
-                    for the CO2
+                    for the CO2 (unused on this layout)
             
             Returns:
             --------
                 None
                    This function draws the screen and does not return any value.
         """
-    #-- Set Font ------------------------------------------------------
-        self.screen_writer.change_font(OpenSansBold_28)  #............ Change the font back to the default for the next screen
+    #-- Draw the new start screen on a white background ----------------
+        self.screen_writer.clear_fb(color=0xFF)
+        fb = self.screen_writer.fb
+        fb.vline(136, 8, 160, 0x00) #........................ Separate CO2 from the climate readings
+        fb.line(136, 57, 263, 57, 0x00) #................... Separate temperature from humidity
+        fb.line(136, 111, 263, 111, 0x00) #................. Separate humidity from pressure
 
-    #-- Clear frame buffer with white color ---------------------------
-        self.screen_writer.clear_fb(color=0x00)
+    #-- Draw CO2 scale, assessment, and current value -------------------
+        self._draw_co2_gauge(CO2)
 
-    #-- Load screen 1 background --------------------------------------
-        fname = "img/static_screen1_background.bin"
-        img_width  = 264
-        img_height = 176
+    #-- Keep temperature and humidity on the right ---------------------
+        self._start_text("Temperature", 145, 260, 8, (OpenSansBold_12,))
+        self._start_text(f"{temp:2.1f} °C", 145, 260, 25)
+        self._start_text("Humidity", 145, 260, 62, (OpenSansBold_12,))
+        self._start_text(f"{hum:2.1f} %", 145, 260, 79)
 
-        self.screen_writer.add_image(
-                            fname,
-                            img_width,
-                            img_height,
-                            x=0,
-                            y=0,
-                            do_gc = True,
-                            invert_colors = False,
-                            show_after = False
-            )
-    
-    #-- Add temperature -----------------------------------------------
-        self.screen_writer.add_text(
-                text = f"{temp:2.1f} °C",
-                x = 145,
-                y = 15,
-                invert = True
-            )
-
-    #-- Add humidity --------------------------------------------------
-        self.screen_writer.add_text(
-                text = f"{hum:2.1f} %",
-                x = 145,
-                y = 70,
-                invert = True
-            )
-
-    #-- Add CO2 --------------------------------------------------------
-        co2_value = f"{CO2:4.0f}"
-        co2_text = f"{co2_value} ppm"
-        if self.screen_writer.writer.stringlen(co2_text) > self.screen_writer.width - 145:
-            co2_text = co2_value #.......................... Hide the unit when the number needs more room; avoid wrapping
-        self.screen_writer.add_text(
-                text = co2_text,
-                x = 145,
-                y = 120,
-                invert = True
-            )
-        
-    #-- Add assesment of air quaility ---------------------------------
-        """
-            - green (good): 400–800 ppm
-            - yellow (medium): 800–1200 ppm
-            - orange (bad): 1200–2000 ppm
-            - red (very bad/alarm): >2000 ppm
-        """
-        self.screen_writer.change_font(OpenSansBold_20)
-        if CO2 < 800:
-            text = "Good"
-        elif CO2 < 1200:
-            text = "Medium"
-        elif CO2 < 2000:
-            text = "Bad"
-        else:
-            text = "Very Bad"
-        
-        self.screen_writer.add_text(
-                text = text,
-                x = 145,
-                y = 150,
-                invert = True
-            )
-        self.screen_writer.change_font(OpenSansBold_28) #............ Change the font back to the default for the next screen
-
-    #-- Add barplot of historical temperature data --------------------
-        x_min = 0
-        y_min = 0
-        x_max = 0.25 * 3600
-        y_max = 40
-
-        x_scr_min = 5
-        y_scr_min = 5
-        x_scr_max = 120
-        y_scr_max = 53
-
-        samples = logger_temperature_shortterm.bin_series()
-
-        self.draw_barplot(
-                x_scr_min,
-                y_scr_min,
-                x_scr_max,
-                y_scr_max,
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-                samples,
-                color=0x00
-            )
-        
-    #-- Add barplot of historical humidity data --------------------
-        x_min = 0
-        y_min = 20
-        x_max = 0.25 * 3600
-        y_max = 100
-
-        x_scr_min = 5
-        y_scr_min = 60
-        x_scr_max = 120
-        y_scr_max = 108
-
-        samples = logger_humidity_shortterm.bin_series()
-
-        self.draw_barplot(
-                x_scr_min,
-                y_scr_min,
-                x_scr_max,
-                y_scr_max,
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-                samples,
-                color=0x00
-            )
-
-    #-- Add barplot of historical CO2 data -------------------------
-        x_min = 0
-        y_min = 400
-        x_max = 0.25 * 3600
-        y_max = 2500
-
-        x_scr_min = 5
-        y_scr_min = 118
-        x_scr_max = 120
-        y_scr_max = 166
-
-        samples = logger_co2_shortterm.bin_series()
-
-        self.draw_barplot(
-                x_scr_min,
-                y_scr_min,
-                x_scr_max,
-                y_scr_max,
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-                samples,
-                color=0x00
-            )
-
-    #-- Return --------------------------------------------------------
+    #-- Show approximate sea-level pressure and its assessment ---------
+        sea_pressure = self._sea_level_pressure(pressure)
+        self._start_text("Pressure (sea)", 145, 260, 116, (OpenSansBold_12,))
+        self._start_text(f"{sea_pressure:.1f} hPa", 145, 260, 132,
+                         (OpenSansBold_20, OpenSansBold_12))
+        self._start_text(self._pressure_status(sea_pressure), 145, 260, 154,
+                         (OpenSansBold_20, OpenSansBold_12))
+        self.screen_writer.change_font(OpenSansBold_28) #.... Restore the default font for other pages
         return
+
+    def _start_text(self, text, x_start, x_end, y, fonts=None):
+        """Center one line in its column, selecting a font that fits."""
+        if fonts is None:
+            fonts = (OpenSansBold_28, OpenSansBold_20, OpenSansBold_12)
+        for font in fonts:
+            self.screen_writer.change_font(font)
+            if self.screen_writer.writer.stringlen(text) <= x_end - x_start:
+                self.screen_writer.add_text_horizontal_center(
+                    text, y, x_start=x_start, x_end=x_end, invert=True)
+                return
+        raise ValueError("Start-screen text exceeds its column: " + text)
+
+    def _sea_level_pressure(self, pressure):
+        """Approximate sea-level pressure using the standard atmosphere."""
+        return pressure * self._pressure_factor
+
+    @staticmethod
+    def _pressure_status(pressure):
+        """Use broad display thresholds, rather than a weather forecast."""
+        if pressure < 1000:
+            return "Low"
+        if pressure > 1020:
+            return "High"
+        return "Normal"
+
+    @staticmethod
+    def _co2_status(co2):
+        """Preserve the existing CO2 assessment thresholds."""
+        if co2 < 800:
+            return "Good"
+        if co2 < 1200:
+            return "Medium"
+        if co2 < 2000:
+            return "Bad"
+        return "Very Bad"
+
+    @staticmethod
+    def _co2_angle(co2):
+        """Map 400..2500 ppm onto a 270-degree arc, clamping the fill level."""
+        return (135 + 270 * (min(2500, max(400, co2)) - 400) / 2100) * math.pi / 180
+
+    def _draw_co2_gauge(self, co2):
+        """Draw an eight-pixel ring filled up to the current CO2 value."""
+        fb = self.screen_writer.fb
+        cx, cy = 67, 82
+        self._start_text("CO2", 5, 130, 5, (OpenSansBold_20,))
+
+    #-- Fill four separated sectors without an extra image buffer ------
+        boundaries = (400, 800, 1200, 2000, 2500)
+        angles = tuple(self._co2_angle(value) for value in boundaries)
+        fill_angle = self._co2_angle(co2)
+        sectors = []
+        for sector in range(4):
+            start = angles[sector] + 0.105 #................ Inset cap centres to preserve the gaps
+            end = angles[sector + 1] - 0.105
+            filled_end = min(end, max(start, fill_angle))
+            sectors.append((start, end, filled_end,
+                            (50 * math.cos(start), 50 * math.sin(start)),
+                            (50 * math.cos(end), 50 * math.sin(end)),
+                            (50 * math.cos(filled_end), 50 * math.sin(filled_end)),
+                            co2 > boundaries[sector]))
+        for dy in range(-53, 54):
+            for dx in range(-53, 54):
+                distance = dx * dx + dy * dy
+                if distance < 46 * 46 or distance >= 54 * 54:
+                    continue
+                angle = math.atan2(dy, dx)
+                if angle < angles[0]:
+                    angle += 2 * math.pi
+                radial_distance = (math.sqrt(distance) - 50) ** 2
+                for start, end, filled_end, first, last, filled_last, active in sectors:
+                    if angle < start - 0.08 or angle > end + 0.08:
+                        continue
+                    track_distance = self._arc_distance_sq(
+                        dx, dy, angle, start, end, first, last, radial_distance)
+                    if track_distance >= 16:
+                        continue
+                    outline = track_distance >= 9 #........ One-pixel contour around the rounded band
+                    filled = active and self._arc_distance_sq(
+                        dx, dy, angle, start, filled_end, first, filled_last,
+                        radial_distance) < 16
+                    fb.pixel(cx + dx, cy + dy, 0x00 if outline or filled else 0xFF)
+                    break
+
+    #-- Keep the assessment inside the arc and ppm beneath it -----------
+        self._start_text(self._co2_status(co2), 22, 112, 71,
+                         (OpenSansBold_20, OpenSansBold_12))
+        self._start_text("400", 9, 41, 120, (OpenSansBold_12,))
+        self._start_text("2500", 91, 130, 120, (OpenSansBold_12,))
+        self._start_text(f"{co2:.0f}", 5, 130, 133)
+        self._start_text("ppm", 5, 130, 163, (OpenSansBold_12,))
+        return
+
+    @staticmethod
+    def _arc_distance_sq(dx, dy, angle, start, end, first, last, radial_distance):
+        """Distance to an arc centreline, including circular end caps."""
+        if angle < start:
+            return (dx - first[0]) ** 2 + (dy - first[1]) ** 2
+        if angle > end:
+            return (dx - last[0]) ** 2 + (dy - last[1]) ** 2
+        return radial_distance
 
 
     def screen2_24h_temperature_history(

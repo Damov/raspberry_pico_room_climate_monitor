@@ -215,7 +215,10 @@ class ButtonTests(unittest.TestCase):
 
     def main_functions(self, namespace):
         tree = ast.parse((ROOT / 'src/main.py').read_text())
-        tree.body = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
+        tree.body = [node for node in tree.body if isinstance(node, ast.FunctionDef) or
+                     (isinstance(node, ast.Assign) and
+                      any(isinstance(target, ast.Name) and target.id == 'ALTITUDE_M'
+                          for target in node.targets))]
         exec(compile(tree, 'main.py', 'exec'), namespace)
         return namespace
 
@@ -255,7 +258,7 @@ class ButtonTests(unittest.TestCase):
 
         sensors.read_measurement.side_effect = read_co2
         sensors.read_compensated.return_value = (22, 1013, 50)
-        manager.screen1.side_effect = lambda *args: events.append('home')
+        manager.screen1.side_effect = lambda *args, **kwargs: events.append('home')
         manager.screen2_24h_temperature_history.side_effect = lambda *args: events.append('next')
         writer.show.side_effect = show
         writer.show_partial.side_effect = partial
@@ -273,7 +276,38 @@ class ButtonTests(unittest.TestCase):
             namespace['_run_monitor'](self.buttons)
         self.assertEqual(events, ['measure', 'home', 'next', 'measure', 'next'])
         self.assertEqual(sensors.read_measurement.call_count, 2)
+        namespace['ScreenManager'].assert_called_once_with(writer, altitude_m=50.0)
         self.assertEqual(writer.show.call_count, 4) #........ Two splash updates, home, and navigation
+
+    def test_maximum_co2_preserves_normal_measurement_and_refresh_cadence(self):
+        writer, manager, sensors, logger = Mock(), Mock(), Mock(), Mock()
+        phases = []
+        sensors.read_measurement.return_value = (2500, 22, 50)
+        sensors.read_compensated.return_value = (22, 1013, 50)
+        manager.screen1.side_effect = lambda *args, **kwargs: phases.append(args[3])
+        partials = [0]
+        def partial():
+            partials[0] += 1
+            if partials[0] == 1:
+                raise KeyboardInterrupt()
+        writer.show_partial.side_effect = partial
+        namespace = self.main_functions({
+            'ticks_ms': lambda: self.now, 'ticks_diff': self.ticks_diff,
+            'sleep_ms': self.advance, 'gc': Mock(), 'Logger': Mock(return_value=logger),
+            'EPD_2in7_V2': Mock(), 'ScreenWriter': Mock(return_value=writer),
+            'ScreenManager': Mock(return_value=manager),
+            'BME280': Mock(return_value=sensors), 'SCD41': Mock(return_value=sensors),
+            'OpenSansBold_28': None, 'OpenSansBold_20': None,
+            'apply_button': self.module.apply_button,
+        })
+        namespace['print_mem'] = Mock()
+        started = self.now
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(KeyboardInterrupt):
+            namespace['_run_monitor'](self.buttons)
+        self.assertEqual(phases, [2500, 2500])
+        self.assertEqual(sensors.read_measurement.call_count, 2)
+        self.assertEqual(logger.add.call_count, 16)
+        self.assertEqual(self.ticks_diff(self.now, started), 30000)
 
     def test_drawing_failure_retries_without_flashing_an_incomplete_frame(self):
         self.test_monitor_captures_busy_presses_without_extra_sensor_reads(fail_first_draw=True)
@@ -321,7 +355,7 @@ class ButtonTests(unittest.TestCase):
             'screen3_24h_humidity_history', 'screen4_24h_co2_history',
             'screen5_24h_pressure_history',
         )):
-            getattr(manager, name).side_effect = lambda *args, n=number: layouts.append(n)
+            getattr(manager, name).side_effect = lambda *args, n=number, **kwargs: layouts.append(n)
         if fail_first_draw:
             original_draw = manager.screen2_24h_temperature_history.side_effect
             failures = [0]
