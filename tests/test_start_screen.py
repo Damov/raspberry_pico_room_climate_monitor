@@ -48,7 +48,17 @@ class StartScreenTests(unittest.TestCase):
             self.assertLess(previous, current)
             previous = current
         self.assertEqual(black_pixels(99999), previous)
-        self.assertGreater(len(previous - empty), 1000)
+        self.assertGreater(len(previous - empty), len(previous) // 3)
+
+    def test_hollow_band_has_two_pixel_contours_and_a_white_centre(self):
+        self.manager.screen1(22.5, 45, 1013.2, 400, None, None, None)
+        for radius in (47, 48, 52, 53):
+            self.assertEqual(self.writer.pixels[67, 82 - radius], 0)
+        for radius in (49, 50, 51):
+            self.assertEqual(self.writer.pixels[67, 82 - radius], 0xFF)
+        self.manager.screen1(22.5, 45, 1013.2, 2500, None, None, None)
+        for radius in (49, 50, 51):
+            self.assertEqual(self.writer.pixels[67, 82 - radius], 0)
 
     def test_fill_endpoint_and_empty_interior(self):
         self.manager.screen1(22.5, 45, 1013.2, 800, None, None, None)
@@ -76,7 +86,7 @@ class StartScreenTests(unittest.TestCase):
         self.assertEqual(self.writer.pixels[point(50, start + 0.105)], 0)
         end = self.manager._co2_angle(1600)
         self.assertEqual(self.writer.pixels[point(50, end + 0.06)], 0)
-        self.assertEqual(self.writer.pixels[point(52, end + 0.075)], 0xFF)
+        self.assertEqual(self.writer.pixels[point(51, end + 0.08)], 0xFF)
 
     def test_altitude_correction_and_default_local_reference(self):
         local = self.manager_class(self.writer)

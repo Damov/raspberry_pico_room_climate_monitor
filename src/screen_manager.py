@@ -181,7 +181,7 @@ class ScreenManager:
                         dx, dy, angle, start, end, first, last, radial_distance)
                     if track_distance >= 16:
                         continue
-                    outline = track_distance >= 9 #........ One-pixel contour around the rounded band
+                    outline = track_distance >= 4 #........ Two-pixel contour around the rounded band
                     filled = active and self._arc_distance_sq(
                         dx, dy, angle, start, filled_end, first, filled_last,
                         radial_distance) < 16
