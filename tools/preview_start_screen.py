@@ -29,6 +29,7 @@ class PreviewWriter:
         self.writer = self
         self.fb = self
         self.texts = []
+        self.icons = []
         self.pixels = {}
         self.image = image
         if image is not None:
@@ -43,6 +44,7 @@ class PreviewWriter:
 
     def clear_fb(self, color=0xFF):
         self.texts.clear()
+        self.icons.clear()
         self.pixels.clear()
         if self.image is not None:
             self.draw.rectangle((0, 0, 263, 175), fill=255 if color else 0)
@@ -58,6 +60,21 @@ class PreviewWriter:
         self.pixels[x, y] = color
         if self.image is not None:
             self.image.putpixel((x, y), 255 if color else 0)
+
+    def add_image(self, fname, img_w, img_h, x=0, y=0, do_gc=True,
+                  show_after=True, invert_colors=True):
+        assert not show_after, "Icons must not trigger their own refresh"
+        assert 0 <= x and x + img_w <= self.width
+        assert 0 <= y and y + img_h <= self.height
+        data = (ROOT / 'src' / fname).read_bytes()
+        assert len(data) == img_w * img_h, fname
+        self.icons.append((fname, x, y, img_w, img_h))
+        if self.image is not None:
+            for row in range(img_h):
+                for col in range(img_w):
+                    value = data[row * img_w + col]
+                    black = (value > 127) if invert_colors else (value <= 127)
+                    self.image.putpixel((x + col, y + row), 0 if black else 255)
 
     def vline(self, x, y, length, color):
         self.line(x, y, x, y + length - 1, color)
