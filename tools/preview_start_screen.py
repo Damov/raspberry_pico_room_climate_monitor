@@ -130,12 +130,14 @@ def main():
     parser.add_argument('--co2', type=float, default=1250)
     parser.add_argument('--pressure', type=float, default=1013.2)
     parser.add_argument('--altitude', type=float, default=50)
+    parser.add_argument('--trend', choices=('up', 'down', 'stable'), default='stable')
     args = parser.parse_args()
     namespace = load_layout()
     image = Image.new('L', (264, 176), 255)
     writer = PreviewWriter(namespace, image)
     manager = namespace['ScreenManager'](writer, altitude_m=args.altitude)
-    manager.screen1(22.5, 45.0, args.pressure, args.co2, None, None, None)
+    manager.screen1(22.5, 45.0, args.pressure, args.co2, None, None, None,
+                    co2_trend_direction={'up': 1, 'down': -1, 'stable': 0}[args.trend])
     image.save(args.output)
     print(args.output)
 

@@ -31,6 +31,8 @@ from error_handling import show_exception_on_screen, write_exception_to_file
 #-- Site configuration ------------------------------------------------
 ALTITUDE_M = 50.0 #........................................ Device height above sea level in metres; used by the start-screen pressure display
 
+CO2_TREND_THRESHOLD_PERCENT = 5.0 #........................ Minimum relative change for an arrow; changes within this percentage are stable
+
 
 def print_mem(label=""):
     """
@@ -76,6 +78,20 @@ def refresh_screen(screen_writer, refresh_state, force_full=False, measurement_d
     return None #.......................................... No refresh is due yet
 
 
+def co2_trend(current, previous, threshold_percent):
+    """Compare consecutive readings, returning up (1), down (-1), or stable (0)."""
+    if threshold_percent < 0:
+        raise ValueError("CO2 trend threshold must be nonnegative")
+    if (previous is None or current is None or
+            not previous > 0 or not current > 0):
+        return 0
+    change = current - previous
+    threshold = previous * threshold_percent / 100
+    if abs(change) <= threshold:
+        return 0
+    return 1 if change > 0 else -1
+
+
 def main():
     """Initialize button sampling and always stop it when the application exits."""
 #-- Define active-low K1, K2, K3, K4 inputs ----------------------------
@@ -102,6 +118,8 @@ def _run_monitor(buttons):
     WAIT_INTERVAL_MS      = 30 * 1000 #............................... Sensor sampling interval in milliseconds
     draw_failures         = 0 #....................................... Consecutive failures while drawing the selected page
     last_measurement      = None #................................... Read sensors before drawing the first page
+    previous_co2          = None #................................... No trend until two sensor readings exist
+    co2_direction         = 0 #...................................... Cache the trend between measurements and page changes
 
 #-- Set time refresh intervals to current time ------------------------
     refresh_state = {
@@ -230,8 +248,11 @@ def _run_monitor(buttons):
             gc.collect() #................................ Free memory before reading the sensors
             print_mem("before loop step")
 
-            CO2, _, _ = sensor_scd41.read_measurement()
+            new_co2, _, _ = sensor_scd41.read_measurement()
             temp, pressure, hum = sensor_bme280.read_compensated()
+            co2_direction = co2_trend(new_co2, previous_co2, CO2_TREND_THRESHOLD_PERCENT)
+            CO2 = new_co2
+            previous_co2 = new_co2 #...................... Advance the reference only after successful sensor reads
 
             print_mem("after sensors")
 
@@ -281,7 +302,8 @@ def _run_monitor(buttons):
                             CO2,
                             logger_temperature_shortterm,
                             logger_humidity_shortterm,
-                            logger_co2_shortterm
+                            logger_co2_shortterm,
+                            co2_trend_direction=co2_direction
                     ) #.............................................. Draw the first screen layout with the latest sensor readings and loggers for short-term history
             elif SCR_LAYOUT_NUMBER == 1:
                 screen_manager.screen2_24h_temperature_history(

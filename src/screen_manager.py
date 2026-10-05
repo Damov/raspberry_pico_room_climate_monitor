@@ -39,7 +39,8 @@ class ScreenManager:
             CO2,
             logger_temperature_shortterm,
             logger_humidity_shortterm,
-            logger_co2_shortterm
+            logger_co2_shortterm,
+            co2_trend_direction=0
         ):
         """
             Draws the CO2 gauge and climate readings on the start screen.
@@ -79,6 +80,7 @@ class ScreenManager:
 
     #-- Draw CO2 scale, assessment, and current value -------------------
         self._draw_co2_gauge(CO2)
+        self._draw_co2_trend_arrow(co2_trend_direction)
 
     #-- Place larger climate symbols beside their values ---------------
         self.screen_writer.add_image("img/thermometer.bin", 16, 32, x=143, y=12,
@@ -196,6 +198,23 @@ class ScreenManager:
         self._start_text(f"{co2:.0f}", 5, 130, 133)
         self._start_text("ppm", 5, 130, 163, (OpenSansBold_12,))
         return
+
+    def _draw_co2_trend_arrow(self, direction):
+        """Draw a short solid arrow below the assessment, or nothing if stable."""
+        if direction == 0:
+            return
+        fb = self.screen_writer.fb
+        if direction > 0:
+            for row in range(10):
+                fb.hline(67 - row, 100 + row, 2 * row + 1, 0x00)
+            stem_y = 109
+        else:
+            for row in range(10):
+                half_width = 9 - row
+                fb.hline(67 - half_width, 108 + row, 2 * half_width + 1, 0x00)
+            stem_y = 100
+        for row in range(9):
+            fb.hline(64, stem_y + row, 6, 0x00) #............ Thick stem, drawn without an extra image asset
 
     @staticmethod
     def _arc_distance_sq(dx, dy, angle, start, end, first, last, radial_distance):

@@ -217,7 +217,7 @@ class ButtonTests(unittest.TestCase):
         tree = ast.parse((ROOT / 'src/main.py').read_text())
         tree.body = [node for node in tree.body if isinstance(node, ast.FunctionDef) or
                      (isinstance(node, ast.Assign) and
-                      any(isinstance(target, ast.Name) and target.id == 'ALTITUDE_M'
+                      any(isinstance(target, ast.Name) and target.id in ('ALTITUDE_M', 'CO2_TREND_THRESHOLD_PERCENT')
                           for target in node.targets))]
         exec(compile(tree, 'main.py', 'exec'), namespace)
         return namespace
@@ -308,6 +308,49 @@ class ButtonTests(unittest.TestCase):
         self.assertEqual(sensors.read_measurement.call_count, 2)
         self.assertEqual(logger.add.call_count, 16)
         self.assertEqual(self.ticks_diff(self.now, started), 30000)
+
+    def test_co2_trend_threshold_and_invalid_readings(self):
+        trend = self.main_functions({})['co2_trend']
+        cases = ((None, 400, 1, 0), (400, None, 1, 0),
+                 (0, 400, 1, 0), (400, 0, 1, 0), (-1, 400, 1, 0),
+                 (400, -1, 1, 0), (400, 400, 1, 0),
+                 (404, 400, 1, 0), (396, 400, 1, 0),
+                 (405, 400, 1, 1), (395, 400, 1, -1),
+                 (408, 400, 2, 0), (392, 400, 2, 0),
+                 (409, 400, 2, 1), (391, 400, 2, -1),
+                 (420, 400, 5, 0), (380, 400, 5, 0),
+                 (421, 400, 5, 1), (379, 400, 5, -1))
+        for current, previous, threshold, expected in cases:
+            with self.subTest(current=current, previous=previous, threshold=threshold):
+                self.assertEqual(trend(current, previous, threshold), expected)
+        with self.assertRaises(ValueError):
+            trend(400, 400, -1)
+
+    def test_co2_trend_is_cached_for_button_refresh(self):
+        writer, manager, sensors, logger = Mock(), Mock(), Mock(), Mock()
+        directions = []
+        sensors.read_measurement.side_effect = [(400, 22, 50), (425, 22, 50)]
+        sensors.read_compensated.return_value = (22, 1013, 50)
+        manager.screen1.side_effect = lambda *args, **kwargs: directions.append(kwargs['co2_trend_direction'])
+        writer.show_partial.side_effect = lambda: self.press(0)
+        def show():
+            if len(directions) == 3:
+                raise KeyboardInterrupt()
+        writer.show.side_effect = show
+        namespace = self.main_functions({
+            'ticks_ms': lambda: self.now, 'ticks_diff': self.ticks_diff,
+            'sleep_ms': self.advance, 'gc': Mock(), 'Logger': Mock(return_value=logger),
+            'EPD_2in7_V2': Mock(), 'ScreenWriter': Mock(return_value=writer),
+            'ScreenManager': Mock(return_value=manager),
+            'BME280': Mock(return_value=sensors), 'SCD41': Mock(return_value=sensors),
+            'OpenSansBold_28': None, 'OpenSansBold_20': None,
+            'apply_button': self.module.apply_button,
+        })
+        namespace['print_mem'] = Mock()
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(KeyboardInterrupt):
+            namespace['_run_monitor'](self.buttons)
+        self.assertEqual(directions, [0, 1, 1])
+        self.assertEqual(sensors.read_measurement.call_count, 2)
 
     def test_drawing_failure_retries_without_flashing_an_incomplete_frame(self):
         self.test_monitor_captures_busy_presses_without_extra_sensor_reads(fail_first_draw=True)

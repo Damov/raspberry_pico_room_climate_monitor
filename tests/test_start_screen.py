@@ -20,6 +20,26 @@ class StartScreenTests(unittest.TestCase):
         self.writer = preview.PreviewWriter(self.namespace)
         self.manager = self.manager_class(self.writer, altitude_m=50)
 
+    def test_trend_arrow_direction_and_text_clearance(self):
+        for co2 in (400, 900, 1500, 2500):
+            for direction in (-1, 0, 1):
+                with self.subTest(co2=co2, direction=direction):
+                    self.manager.screen1(22.5, 45, 1013.2, co2, None, None, None,
+                                         co2_trend_direction=direction)
+                    lines = [line for line in self.writer.lines
+                             if 58 <= line[0] <= line[2] <= 76 and
+                             100 <= line[1] <= line[3] <= 117]
+                    self.assertEqual(len(lines), 19 if direction else 0)
+                    if not direction:
+                        continue
+                    tip_y = 100 if direction > 0 else 117
+                    self.assertIn((67, tip_y, 67, tip_y, 0), lines)
+                    for x0, y0, x1, y1, color in lines:
+                        self.assertEqual(color, 0)
+                        for text, x, y, width, height in self.writer.texts:
+                            self.assertFalse(x0 < x + width and x1 >= x and
+                                             y0 < y + height and y1 >= y, text)
+
     def test_co2_assessment_boundaries(self):
         for value, expected in ((400, 'Good'), (799, 'Good'), (800, 'Medium'),
                                 (1199, 'Medium'), (1200, 'Bad'), (1999, 'Bad'),
