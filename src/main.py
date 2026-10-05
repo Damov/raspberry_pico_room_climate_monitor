@@ -218,8 +218,9 @@ def _run_monitor(buttons):
         now = ticks_ms()
         measurement_due = (
             last_measurement is None or
-            ticks_diff(now, last_measurement) >= WAIT_INTERVAL_MS
-        )
+            (ticks_diff(now, last_measurement) >= WAIT_INTERVAL_MS and
+             buttons.pending() == 0)
+        ) #............................................... Serve queued clicks from cached data before taking a due measurement
         if measurement_due:
         #-- Read and log the latest sensor measurements -----------------------
             gc.collect() #................................ Free memory before reading the sensors

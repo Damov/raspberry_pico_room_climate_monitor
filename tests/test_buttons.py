@@ -232,6 +232,49 @@ class ButtonTests(unittest.TestCase):
             pins = namespace['ButtonController'].call_args.args[0]
             self.assertEqual(tuple(pin.number for pin in pins), (21, 20, 19, 18))
 
+    def test_queued_navigation_precedes_due_measurement_then_sampling_resumes(self):
+        events = []
+        writer = Mock()
+        sensors = Mock()
+        manager = Mock()
+        logger = Mock()
+        injected = [False]
+
+        def read_co2():
+            events.append('measure')
+            return 400, 22, 50
+
+        def show():
+            if events == ['measure', 'home'] and not injected[0]:
+                injected[0] = True
+                self.advance(30000) #...................... Make the next measurement due while the display is busy
+                self.press(1) #............................ Queue Down during that update
+
+        def partial():
+            raise KeyboardInterrupt()
+
+        sensors.read_measurement.side_effect = read_co2
+        sensors.read_compensated.return_value = (22, 1013, 50)
+        manager.screen1.side_effect = lambda *args: events.append('home')
+        manager.screen2_24h_temperature_history.side_effect = lambda *args: events.append('next')
+        writer.show.side_effect = show
+        writer.show_partial.side_effect = partial
+        namespace = self.main_functions({
+            'ticks_ms': lambda: self.now, 'ticks_diff': self.ticks_diff,
+            'sleep_ms': self.advance, 'gc': Mock(), 'Logger': Mock(return_value=logger),
+            'EPD_2in7_V2': Mock(), 'ScreenWriter': Mock(return_value=writer),
+            'ScreenManager': Mock(return_value=manager),
+            'BME280': Mock(return_value=sensors), 'SCD41': Mock(return_value=sensors),
+            'OpenSansBold_28': None, 'OpenSansBold_20': None,
+            'apply_button': self.module.apply_button,
+        })
+        namespace['print_mem'] = Mock()
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(KeyboardInterrupt):
+            namespace['_run_monitor'](self.buttons)
+        self.assertEqual(events, ['measure', 'home', 'next', 'measure', 'next'])
+        self.assertEqual(sensors.read_measurement.call_count, 2)
+        self.assertEqual(writer.show.call_count, 4) #........ Two splash updates, home, and navigation
+
     def test_drawing_failure_retries_without_flashing_an_incomplete_frame(self):
         self.test_monitor_captures_busy_presses_without_extra_sensor_reads(fail_first_draw=True)
 
