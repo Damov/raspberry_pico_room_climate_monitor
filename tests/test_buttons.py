@@ -232,7 +232,10 @@ class ButtonTests(unittest.TestCase):
             pins = namespace['ButtonController'].call_args.args[0]
             self.assertEqual(tuple(pin.number for pin in pins), (21, 20, 19, 18))
 
-    def test_monitor_captures_busy_presses_without_extra_sensor_reads(self):
+    def test_drawing_failure_retries_without_flashing_an_incomplete_frame(self):
+        self.test_monitor_captures_busy_presses_without_extra_sensor_reads(fail_first_draw=True)
+
+    def test_monitor_captures_busy_presses_without_extra_sensor_reads(self, fail_first_draw=False):
         layouts = []
         measurements = []
         samples = []
@@ -276,6 +279,17 @@ class ButtonTests(unittest.TestCase):
             'screen5_24h_pressure_history',
         )):
             getattr(manager, name).side_effect = lambda *args, n=number: layouts.append(n)
+        if fail_first_draw:
+            original_draw = manager.screen2_24h_temperature_history.side_effect
+            failures = [0]
+
+            def retry_draw(*args):
+                if failures[0] == 0:
+                    failures[0] += 1
+                    raise MemoryError('simulated drawing failure')
+                original_draw(*args)
+
+            manager.screen2_24h_temperature_history.side_effect = retry_draw
         logger = Mock()
         logger.add.side_effect = lambda *args: samples.append(args)
         namespace = self.main_functions({

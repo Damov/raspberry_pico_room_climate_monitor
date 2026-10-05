@@ -32,6 +32,7 @@
 # -----------------------------------------------------------------------------
 # 2026-02-22 : added method display_Landscape_Fast()
 # 2026-02-22 : added method display_Landscape_Partial()
+# 2026-10-05 : restore controller state and RAM addresses for page updates
 # =============================================================================
 
 from machine import Pin, SPI
@@ -324,40 +325,53 @@ class EPD_2in7_V2:
         self.send_data1(image)
         self.TurnOnDisplay()
         
-    def display_Landscape(self, image):
-        if(self.width % 8 == 0):
-            Width = self.width // 8
-        else:
-            Width = self.width // 8 +1
+    def _write_landscape(self, image):
+        """
+            Write a landscape frame from the beginning of the display RAM.
+
+            Restore the full write window and both address counters before
+            every transfer, including after switching refresh modes.
+        """
+        Width = (self.width + 7) // 8
         Height = self.height
+
+    #-- Set the complete RAM write window and entry direction -------------
+        self.send_command(0x11) #......................... Increment X, then Y
+        self.send_data(0x03)
+        self.send_command(0x44) #......................... RAM X window in bytes
+        self.send_data(0x00)
+        self.send_data(Width - 1)
+        self.send_command(0x45) #......................... RAM Y window in pixels
+        self.send_data(0x00)
+        self.send_data(0x00)
+        self.send_data((Height - 1) & 0xFF)
+        self.send_data((Height - 1) >> 8)
+
+    #-- Start every frame at the first RAM address ------------------------
+        self.send_command(0x4E) #......................... Reset RAM X address counter
+        self.send_data(0x00)
+        self.send_command(0x4F) #......................... Reset RAM Y address counter
+        self.send_data(0x00)
+        self.send_data(0x00)
+
+    #-- Transfer the frame using the existing landscape orientation -------
         self.send_command(0x24)
         for j in range(Height):
             for i in range(Width):
-                self.send_data(image[(21-i) * Height + j])
+                self.send_data(image[(Width - 1 - i) * Height + j])
+
+    def display_Landscape(self, image):
+    #-- Restore full-refresh mode before sending a new page ---------------
+        self.init() #..................................... Clear controller state left by partial or fast updates
+        self._write_landscape(image)
         self.TurnOnDisplay()
 
     def display_Landscape_Fast(self, image):
-        if(self.width % 8 == 0):
-            Width = self.width // 8
-        else:
-            Width = self.width // 8 + 1
-        Height = self.height
-        self.send_command(0x24)
-        for j in range(Height):
-            for i in range(Width):
-                self.send_data(image[(21-i) * Height + j])
+        self._write_landscape(image)
         self.TurnOnDisplay_Fast()
 
     def display_Landscape_Partial(self, image):
-        if(self.width % 8 == 0):
-            Width = self.width // 8
-        else:
-            Width = self.width // 8 + 1
-        Height = self.height
-        self.send_command(0x24)
-        for j in range(Height):
-            for i in range(Width):
-                self.send_data(image[(21-i) * Height + j])
+        self._write_landscape(image)
         self.TurnOnDisplay_Partial()
 
     def display_Fast(self, image):

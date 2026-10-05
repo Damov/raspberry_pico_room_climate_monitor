@@ -69,6 +69,7 @@ def _run_monitor(buttons):
     SCR_MAX_LAYOUT_NUMBER = 4 #....................................... Five available screen layouts
     SCR_FULL_REFRESH      = False #................................... Full refresh requested by a button event
     WAIT_INTERVAL_MS      = 30 * 1000 #............................... Sensor sampling interval in milliseconds
+    draw_failures         = 0 #....................................... Consecutive failures while drawing the selected page
     last_measurement      = None #................................... Read sensors before drawing the first page
 
 #-- Set time refresh intervals to current time ------------------------
@@ -271,7 +272,15 @@ def _run_monitor(buttons):
             else:
                 raise ValueError(f"Invalid screen mode: {SCR_LAYOUT_NUMBER}") #........ Reject an invalid screen layout
         except MemoryError as e:
-            print(f"MemoryError: {e}")
+            draw_failures += 1
+            print(f"MemoryError drawing layout {SCR_LAYOUT_NUMBER}: {e}")
+            if draw_failures >= 3:
+                raise #................................... Report persistent failures through the existing error handler
+            SCR_FULL_REFRESH = True #...................... Retry the selected page without another button press
+            gc.collect()
+            sleep_ms(50)
+            continue #.................................... Never refresh an incomplete frame after drawing fails
+        draw_failures = 0
 
     #-- Update screen -----------------------------------------------------
         if first_refresh or SCR_FULL_REFRESH:
